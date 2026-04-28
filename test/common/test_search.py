@@ -41,11 +41,23 @@ def close_cookie_banner(page: Page):
         pass
 
 
+def close_challenge_dialog(page: Page):
+    """关闭挑战成功弹窗"""
+    try:
+        close_btn = page.locator(".mat-mdc-dialog-surface button[aria-label='Close'], .mat-dialog-actions button")
+        if close_btn.is_visible(timeout=2000):
+            close_btn.click()
+            page.wait_for_timeout(500)
+    except:
+        pass
+
+
 def test_search_exact_match(logged_in_page: Page):
     """搜索存在的商品 - 精确匹配"""
     # Arrange
     page = logged_in_page
     close_cookie_banner(page)
+    close_challenge_dialog(page)
     
     # Act
     search_input = activate_search(page)
@@ -54,7 +66,10 @@ def test_search_exact_match(logged_in_page: Page):
     
     # Assert
     page.wait_for_timeout(2000)
-    products = page.locator("div[class*='card'], article, [class*='product']")
+    close_challenge_dialog(page)  # 搜索后可能出现新的挑战弹窗
+    
+    # 使用更精确的商品卡片选择器，排除挑战消息
+    products = page.locator("mat-card, .mat-card, div[class*='card'][class*='product']")
     expect(products.first).to_be_visible(timeout=10000)
     expect(products.first).to_contain_text("Apple Juice")
 

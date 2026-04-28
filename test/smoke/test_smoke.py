@@ -6,15 +6,42 @@ from playwright.sync_api import Page, expect
 BASE_URL = "http://localhost:3000"
 
 
+def close_dialogs(page: Page):
+    """关闭弹窗"""
+    try:
+        # 关闭 Cookie 弹窗
+        cookie_btn = page.get_by_role("button", name="Me want it!")
+        if cookie_btn.is_visible(timeout=2000):
+            cookie_btn.click()
+            page.wait_for_timeout(500)
+        
+        # 关闭其他弹窗
+        close_buttons = page.locator(".mat-mdc-dialog-surface button[aria-label='Close'], .mat-dialog-actions button, button:has-text('Close')")
+        for btn in close_buttons.all():
+            if btn.is_visible():
+                btn.click()
+                page.wait_for_timeout(500)
+    except:
+        pass
+
+
 @pytest.mark.smoke
 def test_login_smoke(page: Page):
     """冒烟测试：登录功能"""
     page.goto(f"{BASE_URL}/#/login")
     page.wait_for_load_state("networkidle")
     
+    # 关闭可能存在的弹窗
+    close_dialogs(page)
+    
     page.fill("#email", "admin@juice-sh.op")
     page.fill("#password", "admin123")
-    page.click("#loginButton")
+    
+    # 再次检查并关闭弹窗
+    close_dialogs(page)
+    
+    # 使用 force=True 强制点击，避免被弹窗拦截
+    page.click("#loginButton", force=True)
     
     page.wait_for_url(f"{BASE_URL}/#/search", timeout=10000)
     expect(page).to_have_url(f"{BASE_URL}/#/search")
