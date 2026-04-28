@@ -1,0 +1,80 @@
+name: Create Issue on Test Failure
+
+on:
+  workflow_run:
+    workflows: ["Run Tests"]
+    types: [completed]
+
+jobs:
+  create-issue:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    permissions:
+      issues: write
+      actions: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download workflow artifacts
+        uses: dawidd6/action-download-artifact@v2
+        with:
+          workflow: ${{ github.event.workflow_run.workflow_id }}
+          run_id: ${{ github.event.workflow_run.id }}
+          name: test-results
+          path: ./test-results
+
+      - name: Extract failure details
+        id: extract-failures
+        run: |
+          # 尝试从测试结果文件中提取失败信息
+          FAILURES=$(cat ./test-results/failures.txt 2>/dev/null || echo "无法获取详细失败信息")
+          echo "failures<<EOF" >> $GITHUB_OUTPUT
+          echo "$FAILURES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_NUMBER: ${{ github.event.workflow_run.run_number }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+          COMMIT: ${{ github.event.workflow_run.head_sha }}
+          FAILURES: ${{ steps.extract-failures.outputs.failures }}
+        run: |
+          RUN_URL="https://github.com/${REPO}/actions/runs/${RUN_ID}"
+          COMMIT_URL="https://github.com/${REPO}/commit/${COMMIT}"
+          
+          # 检查是否已存在相同的 issue
+          EXISTING_ISSUE=$(gh issue list \
+            --state open \
+            --label "auto-reported" \
+            --search "测试失败 - 运行 #${RUN_NUMBER}" \
+            --json number \
+            --limit 1 2>/dev/null | grep -o '[0-9]\+' || echo "")
+          
+          if [ -n "$EXISTING_ISSUE" ]; then
+            echo "Issue #${EXISTING_ISSUE} 已存在，跳过创建"
+            exit 0
+          fi
+          
+          # 创建 issue
+          gh issue create \
+            --title "[自动化Bug] 测试失败 - 运行 #${RUN_NUMBER}" \
+            --body "## 🐛 测试失败报告
+
+**运行链接**: [查看运行](${RUN_URL})
+
+**分支**: `${BRANCH}`
+
+**提交**: [${COMMIT:0:7}](${COMMIT_URL})
+
+**失败详情**:
+\`\`\`
+${FAILURES}
+\`\`\`
+
+---
+*此 issue 由 GitHub Actions 自动创建*" \
+            --label "bug,auto-reported,testing"
