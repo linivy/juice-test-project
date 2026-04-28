@@ -1,7 +1,6 @@
 name: Run Tests
 
 on:
-  # 推送到 main 分支时触发冒烟测试（排除文档文件）
   push:
     branches: [ main ]
     paths-ignore:
@@ -9,11 +8,9 @@ on:
       - '**.md'
       - '.gitignore'
   
-  # Pull Request 时触发关键路径测试
   pull_request:
     branches: [ main ]
   
-  # 手动触发（支持选择测试级别）
   workflow_dispatch:
     inputs:
       test_level:
@@ -22,9 +19,9 @@ on:
         default: 'smoke'
         type: choice
         options:
-          - 'smoke'      # 冒烟测试 (~30秒)
-          - 'critical'   # 关键路径测试 (~2分钟)
-          - 'regression' # 回归测试 (~5分钟)
+          - 'smoke'
+          - 'critical'
+          - 'regression'
 
 jobs:
   test:
@@ -34,7 +31,6 @@ jobs:
       issues: write
       pull-requests: write
     timeout-minutes: 10
-    
     steps:
       - uses: actions/checkout@v4
       
@@ -99,23 +95,9 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           RUN_NUMBER: ${{ github.run_number }}
         run: |
-          FAILED=$(grep "FAILED" test-output.txt | head -5)
-          echo "## 🐛 测试失败报告
-**运行链接**: ${RUN_URL}
-**测试级别**: ${{ steps.scope.outputs.test_level }}
-
-### 失败的测试
-\`\`\`
-${FAILED}
-\`\`\`
-
----
-*此 Issue 由 GitHub Actions 自动创建*" > issue_body.md
-          
-          gh issue create \
-            --title "[自动化Bug] 测试失败 - 运行 #${RUN_NUMBER}" \
-            --body-file issue_body.md \
-            --label "bug"
+          FAILED=$(grep "FAILED" test-output.txt | head -3 | tr '\n' ';')
+          echo "测试失败: ${RUN_URL}\n测试级别: ${{ steps.scope.outputs.test_level }}\n失败用例: ${FAILED}" > issue_body.md
+          gh issue create --title "[自动化Bug] 测试失败 - 运行 #${RUN_NUMBER}" --body-file issue_body.md --label "bug"
 
       - name: Comment on PR failure
         if: steps.tests.outputs.exit_code != '0' && github.event_name == 'pull_request'
@@ -124,14 +106,6 @@ ${FAILED}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          FAILED=$(grep "FAILED" test-output.txt | head -3)
-          echo "## ❌ 测试失败
-**测试级别**: ${{ steps.scope.outputs.test_level }}
-**运行链接**: [查看详情](${RUN_URL})
-
-### 失败的测试
-\`\`\`
-${FAILED}
-\`\`\`" > pr_comment.md
-          
+          FAILED=$(grep "FAILED" test-output.txt | head -3 | tr '\n' ';')
+          echo "测试失败: [查看详情](${RUN_URL})\n测试级别: ${{ steps.scope.outputs.test_level }}\n失败用例: ${FAILED}" > pr_comment.md
           gh pr comment ${PR_NUMBER} --body-file pr_comment.md
