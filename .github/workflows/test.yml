@@ -37,11 +37,11 @@ jobs:
 
       - name: Run tests
         id: tests
-        continue-on-error: true
         run: |
           pytest test/ -v --tb=short --junitxml=test-results/results.xml 2>&1 | tee test-results/output.txt
-          # 保存退出码
-          echo "exit_code=$?" >> $GITHUB_OUTPUT
+          EXIT_CODE=$?
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+          exit $EXIT_CODE
 
       - name: Upload test results
         if: always()
@@ -52,7 +52,7 @@ jobs:
           retention-days: 7
 
       - name: Create Issue on failure
-        if: steps.tests.outputs.exit_code != '0' && github.event_name == 'push'
+        if: always() && steps.tests.outputs.exit_code != '0' && github.event_name == 'push'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -61,10 +61,13 @@ jobs:
           echo "测试失败，创建 Issue..."
           
           # 获取失败信息
-          FAILURE_SUMMARY=$(grep -A 10 "FAILED" test-results/output.txt | head -20 || echo "测试失败")
+          FAILURE_SUMMARY=$(grep -A 15 "FAILED" test-results/output.txt | head -30 || echo "测试失败")
           
+          echo "失败信息:"
+          echo "$FAILURE_SUMMARY"
+          
+          # 创建 issue
           gh issue create \
             --title "[自动化Bug] 测试失败 - 运行 #${RUN_NUMBER}" \
             --body "## 🐛 测试失败报告\n\n**运行链接**: ${RUN_URL}\n\n**失败的测试**:\n\`\`\`\n${FAILURE_SUMMARY}\n\`\`\`\n\n---\n*此 issue 由 GitHub Actions 自动创建*" \
-            --label "bug,auto-reported" \
-            2>/dev/null || echo "Issue 创建失败"
+            --label "bug,auto-reported"
