@@ -15,71 +15,49 @@ jobs:
       actions: read
       contents: read
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Download workflow artifacts
+      - name: Download test results
         uses: actions/download-artifact@v4
         with:
           name: test-results
           path: ./test-results
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
         continue-on-error: true
 
-      - name: List downloaded files
-        run: ls -la ./test-results/ || echo "No test-results directory"
-
-      - name: Extract failure details
-        id: extract-failures
+      - name: Get failure details
+        id: failures
         run: |
-          # 尝试从多个文件中提取失败信息
-          FAILURES=""
+          FAILURE_DETAILS=""
           
-          # 从 failures.txt 提取
-          if [ -f ./test-results/failures.txt ]; then
-            FAILURES=$(cat ./test-results/failures.txt)
+          # 尝试从 output.txt 提取失败信息
+          if [ -f ./test-results/output.txt ]; then
+            FAILURE_DETAILS=$(grep -A 10 "FAILED" ./test-results/output.txt | head -50)
           fi
           
-          # 如果 failures.txt 为空，从 output.txt 提取
-          if [ -z "$FAILURES" ] && [ -f ./test-results/output.txt ]; then
-            FAILURES=$(grep -A 30 "FAILED" ./test-results/output.txt | head -100)
+          # 如果 output.txt 没有，尝试从 results.xml 提取
+          if [ -z "$FAILURE_DETAILS" ] && [ -f ./test-results/results.xml ]; then
+            FAILURE_DETAILS=$(grep -A 5 "failure" ./test-results/results.xml | head -30)
           fi
           
-          # 如果还是为空，从 results.xml 提取
-          if [ -z "$FAILURES" ] && [ -f ./test-results/results.xml ]; then
-            FAILURES=$(cat ./test-results/results.xml | grep -i failure | head -5)
+          # 如果都没有，使用默认消息
+          if [ -z "$FAILURE_DETAILS" ]; then
+            FAILURE_DETAILS="测试失败，请查看运行日志获取详细信息"
           fi
           
-          # 如果都为空
-          if [ -z "$FAILURES" ]; then
-            FAILURES="无法获取详细失败信息，请查看运行日志"
-          fi
-          
-          # 限制失败信息长度
-          FAILURES=$(echo "$FAILURES" | head -20)
-          
-          echo "failures<<EOF" >> $GITHUB_OUTPUT
-          echo "$FAILURES" >> $GITHUB_OUTPUT
+          # 设置输出
+          echo "details<<EOF" >> $GITHUB_OUTPUT
+          echo "$FAILURE_DETAILS" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create Issue
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
           RUN_NUMBER: ${{ github.event.workflow_run.run_number }}
-          REPO: ${{ github.repository }}
           BRANCH: ${{ github.event.workflow_run.head_branch }}
-          COMMIT: ${{ github.event.workflow_run.head_sha }}
-          FAILURES: ${{ steps.extract-failures.outputs.failures }}
+          REPO: ${{ github.repository }}
         run: |
-          RUN_URL="https://github.com/${REPO}/actions/runs/${RUN_ID}"
-          COMMIT_URL="https://github.com/${REPO}/commit/${COMMIT}"
-          
-          echo "创建 issue 用于运行 #${RUN_NUMBER}"
-          echo "失败详情:"
-          echo "$FAILURES"
-          
-          # 创建 issue
           gh issue create \
             --title "[自动化Bug] 测试失败 - 运行 #${RUN_NUMBER}" \
-            --body "## 测试失败报告\n\n**运行链接**: ${RUN_URL}\n\n**分支**: ${BRANCH}\n\n**提交**: [${COMMIT:0:7}](${COMMIT_URL})\n\n**失败详情**:\n\`\`\`\n${FAILURES}\n\`\`\`\n\n---\n*此 issue 由 GitHub Actions 自动创建*" \
-            --label "bug"
+            --body "## 🐛 测试失败报告\n\n**运行链接**: ${RUN_URL}\n\n**分支**: ${BRANCH}\n\n**失败详情**:\n\`\`\`\n${{ steps.failures.outputs.details }}\n\`\`\`\n\n---\n*此 issue 由 GitHub Actions 自动创建*" \
+            --label "bug,auto-reported"

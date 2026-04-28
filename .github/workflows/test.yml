@@ -10,6 +10,9 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write  # 允许创建 Issue
     steps:
       - uses: actions/checkout@v4
       
@@ -20,7 +23,7 @@ jobs:
       
       - name: Install dependencies
         run: |
-          pip install pytest playwright pytest-playwright
+          pip install pytest pytest-playwright
           playwright install chromium
       
       - name: Start Juice Shop
@@ -33,15 +36,46 @@ jobs:
         run: mkdir -p test-results
 
       - name: Run tests
-        run: pytest test/ -v --tb=short --junitxml=test-results/results.xml 2>&1 | tee test-results/output.txt || true
+        id: tests
+        run: |
+          pytest test/ -v --tb=short --junitxml=test-results/results.xml 2>&1 | tee test-results/output.txt
+          # 检查测试是否失败
+          if grep -q "FAILED" test-results/output.txt; then
+            echo "tests_failed=true" >> $GITHUB_OUTPUT
+            exit 1
+          else
+            echo "tests_failed=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Extract failures
+        if: always()
         run: |
-          grep -A 20 "FAILED" test-results/output.txt > test-results/failures.txt || echo "No failures found" > test-results/failures.txt
+          echo "=== 提取失败信息 ==="
+          grep -A 30 "FAILED" test-results/output.txt > test-results/failures.txt || echo "No failures found" > test-results/failures.txt
+          cat test-results/failures.txt
 
       - name: Upload test results
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-results
           path: test-results/
           retention-days: 7
+
+      - name: Create Issue on failure
+        if: steps.tests.outputs.tests_failed == 'true' && github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          echo "创建 Issue 用于运行 #${RUN_NUMBER}"
+          
+          # 获取失败测试摘要
+          FAILURE_SUMMARY=$(cat test-results/failures.txt | head -20 || echo "测试失败")
+          
+          # 创建 issue
+          gh issue create \
+            --title "[自动化Bug] 测试失败 - 运行 #${RUN_NUMBER}" \
+            --body "## 🐛 测试失败报告\n\n**运行链接**: ${RUN_URL}\n\n**失败的测试**:\n\`\`\`\n${FAILURE_SUMMARY}\n\`\`\`\n\n### 详细信息\n\n请查看 [Actions 运行日志](${RUN_URL}) 获取完整信息。\n\n---\n*此 issue 由 GitHub Actions 自动创建*" \
+            --label "bug,auto-reported"
