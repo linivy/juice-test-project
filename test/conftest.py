@@ -96,48 +96,25 @@ def api_request_context(context: BrowserContext):
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
 def pytest_runtest_makereport(item, call):
-    """测试失败时自动截图和保存日志"""
+    """测试失败时自动截图"""
     outcome = yield
     report = outcome.get_result()
     
     # 只在测试执行阶段(call)失败时截图
     if report.when == "call" and report.failed:
-        # 尝试获取 page fixture
-        page = item.funcargs.get("page")
-        
-        if page is None:
-            # 尝试从 logged_in_page fixture 获取
-            page = item.funcargs.get("logged_in_page")
-        
         # 生成时间戳和测试名称
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        test_name = item.name.replace("[", "_").replace("]", "_")  # 清理特殊字符
+        test_name = item.name.replace("[", "_").replace("]", "_")
         
-        if page:
-            try:
-                # 1. 保存页面截图
+        # 尝试获取 page fixture
+        try:
+            page = item.funcargs.get("page", None)
+            if page is None:
+                page = item.funcargs.get("logged_in_page", None)
+            
+            if page:
                 screenshot_path = f"test-results/screenshots/{test_name}_{timestamp}.png"
                 page.screenshot(path=screenshot_path, full_page=True)
                 print(f"\n📸 截图已保存: {screenshot_path}")
-                
-                # 2. 保存页面 HTML
-                html_path = f"test-results/screenshots/{test_name}_{timestamp}.html"
-                with open(html_path, "w", encoding="utf-8") as f:
-                    f.write(page.content())
-                print(f"📄 HTML 源码已保存: {html_path}")
-                
-            except Exception as e:
-                print(f"⚠️ 截图时发生错误: {str(e)}")
-        
-        # 4. 保存测试失败信息到日志文件
-        log_path = f"test-results/logs/{test_name}_{timestamp}_error.log"
-        with open(log_path, "w", encoding="utf-8") as f:
-            f.write(f"测试名称: {item.name}\n")
-            f.write(f"测试路径: {item.path}\n")
-            f.write(f"失败时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            f.write(f"\n=== 错误信息 ===\n")
-            f.write(str(report.longrepr) + "\n")
-            f.write(f"\n=== 堆栈跟踪 ===\n")
-            if call.excinfo:
-                f.write("\n".join(traceback.format_tb(call.excinfo.tb)))
-        print(f"📝 错误日志已保存: {log_path}")
+        except Exception:
+            pass
