@@ -32,27 +32,14 @@ jobs:
       - name: Wait for Juice Shop
         run: sleep 10
       
-      - name: Create test results directory
-        run: mkdir -p test-results
-
       - name: Run tests
         id: tests
+        continue-on-error: true
         run: |
-          pytest test/ -v --tb=short --junitxml=test-results/results.xml 2>&1 | tee test-results/output.txt
-          EXIT_CODE=$?
-          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
-          exit $EXIT_CODE
-
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results
-          path: test-results/
-          retention-days: 7
+          pytest test/ -v --tb=short | tee test-output.txt
 
       - name: Create Issue on failure
-        if: always() && steps.tests.outputs.exit_code != '0' && github.event_name == 'push'
+        if: failure() && github.event_name == 'push'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -60,14 +47,10 @@ jobs:
         run: |
           echo "测试失败，创建 Issue..."
           
-          # 获取失败信息
-          FAILURE_SUMMARY=$(grep -A 15 "FAILED" test-results/output.txt | head -30 || echo "测试失败")
+          # 获取失败测试名称
+          FAILED_TESTS=$(grep "FAILED" test-output.txt | head -5 || echo "未知测试")
           
-          echo "失败信息:"
-          echo "$FAILURE_SUMMARY"
-          
-          # 创建 issue
           gh issue create \
             --title "[自动化Bug] 测试失败 - 运行 #${RUN_NUMBER}" \
-            --body "## 🐛 测试失败报告\n\n**运行链接**: ${RUN_URL}\n\n**失败的测试**:\n\`\`\`\n${FAILURE_SUMMARY}\n\`\`\`\n\n---\n*此 issue 由 GitHub Actions 自动创建*" \
+            --body "## 🐛 测试失败报告\n\n**运行链接**: ${RUN_URL}\n\n**失败的测试**:\n\`\`\`\n${FAILED_TESTS}\n\`\`\`\n\n请查看日志确认失败原因。" \
             --label "bug,auto-reported"
