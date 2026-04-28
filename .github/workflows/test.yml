@@ -34,23 +34,32 @@ jobs:
       
       - name: Run tests
         id: tests
-        continue-on-error: true
         run: |
-          pytest test/ -v --tb=short | tee test-output.txt
+          pytest test/ -v --tb=short 2>&1 | tee test-output.txt
+          # 保存退出码（使用 ${PIPESTATUS[0]} 获取管道中第一个命令的退出码）
+          EXIT_CODE=${PIPESTATUS[0]}
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+          exit $EXIT_CODE
+
+      - name: Display test output
+        run: cat test-output.txt
 
       - name: Create Issue on failure
-        if: failure() && github.event_name == 'push'
+        if: steps.tests.outputs.exit_code != '0' && github.event_name == 'push'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           RUN_NUMBER: ${{ github.run_number }}
         run: |
-          echo "测试失败，创建 Issue..."
+          echo "测试失败 (exit code: ${{ steps.tests.outputs.exit_code }})，创建 Issue..."
           
           # 获取失败测试名称
-          FAILED_TESTS=$(grep "FAILED" test-output.txt | head -5 || echo "未知测试")
+          FAILED_TESTS=$(grep "FAILED" test-output.txt | head -10 || echo "未知测试")
+          
+          echo "失败的测试: $FAILED_TESTS"
           
           gh issue create \
             --title "[自动化Bug] 测试失败 - 运行 #${RUN_NUMBER}" \
             --body "## 🐛 测试失败报告\n\n**运行链接**: ${RUN_URL}\n\n**失败的测试**:\n\`\`\`\n${FAILED_TESTS}\n\`\`\`\n\n请查看日志确认失败原因。" \
-            --label "bug,auto-reported"
+            --label "bug,auto-reported" \
+            2>/dev/null || echo "Issue 创建失败"
