@@ -65,7 +65,7 @@ jobs:
             
             gh issue create \
               --title "[自动化Bug] 测试失败 - 运行 #${RUN_NUMBER}" \
-              --body "## 🐛 测试失败报告\n\n**运行链接**: ${RUN_URL}\n\n**失败的测试**:\n\`\`\`\n${FAILED_TESTS}\n\`\`\`\n\n请查看日志确认失败原因。" \
+              --body "## 🐛 测试失败的报告\n\n**运行链接**: ${RUN_URL}\n\n**失败的测试**:\n\`\`\`\n${FAILED_TESTS}\n\`\`\`\n\n请查看日志确认失败原因。" \
               --label "bug,auto-reported"
             
             echo "Issue 创建成功！"
