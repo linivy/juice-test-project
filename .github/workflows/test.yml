@@ -34,10 +34,11 @@ jobs:
       
       - name: Run tests
         id: tests
-        continue-on-error: true
         run: |
           pytest test/ -v --tb=short 2>&1 | tee test-output.txt
-          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+          EXIT_CODE=${PIPESTATUS[0]}
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+          exit $EXIT_CODE
 
       - name: Upload artifacts
         if: always()
@@ -50,107 +51,14 @@ jobs:
           retention-days: 7
 
       - name: Create Issue on failure
-        if: steps.tests.outputs.exit_code != '0' && github.event_name == 'push'
+        if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           RUN_NUMBER: ${{ github.run_number }}
-          ACTOR: ${{ github.actor }}
-          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
-          COMMIT_SHA: ${{ github.sha }}
         run: |
-          TOTAL_TESTS=$(grep -E "passed|failed" test-output.txt | tail -1 | grep -oP '\d+' | head -1 || echo "0")
-          PASSED_TESTS=$(grep -E "passed" test-output.txt | tail -1 | grep -oP '\d+(?= passed)' || echo "0")
-          FAILED_TESTS=$(grep "FAILED" test-output.txt | wc -l)
-          FAILED_LIST=$(grep "FAILED" test-output.txt | head -5 | awk '{print $1}' | tr '\n' ', ')
-          ERROR_MSG=$(grep -A 3 "FAILED" test-output.txt | grep -E "AssertionError|TimeoutError" | head -1 | cut -c 1-200)
-          
-          if [ "$TOTAL_TESTS" -gt 0 ]; then
-            FAILURE_RATE=$(echo "scale=2; $FAILED_TESTS * 100 / $TOTAL_TESTS" | bc)
-          else
-            FAILURE_RATE="0"
+          if [ "${{ steps.tests.outputs.exit_code }}" != "0" ] && [ "${{ github.event_name }}" = "push" ]; then
+            FAILED=$(grep "FAILED" test-output.txt | head -3)
+            echo "测试失败: ${RUN_URL}\n失败用例:\n${FAILED}" > issue_body.md
+            gh issue create --title "[自动化Bug] 测试失败 - 运行 #${RUN_NUMBER}" --body-file issue_body.md --label "bug"
           fi
-          
-          # 直接用 echo 生成 Issue 内容，避免 heredoc 问题
-          echo "## 🐛 Bug 描述" > issue_body.md
-          echo "" >> issue_body.md
-          echo "测试执行失败，**${FAILED_TESTS}** 个测试未通过" >> issue_body.md
-          echo "" >> issue_body.md
-          echo "---" >> issue_body.md
-          echo "" >> issue_body.md
-          echo "## 📊 测试概览" >> issue_body.md
-          echo "" >> issue_body.md
-          echo "| 指标 | 详情 |" >> issue_body.md
-          echo "|------|------|" >> issue_body.md
-          echo "| 📋 运行编号 | [#${RUN_NUMBER}](${RUN_URL}) |" >> issue_body.md
-          echo "| 🔀 触发方式 | push |" >> issue_body.md
-          echo "| 🌿 分支 | main |" >> issue_body.md
-          echo "| 📝 提交 | [${COMMIT_SHA::7}](${REPO_URL}/commit/${COMMIT_SHA}) |" >> issue_body.md
-          echo "| 👤 触发用户 | @${ACTOR} |" >> issue_body.md
-          echo "| 📈 失败率 | ${FAILURE_RATE}% |" >> issue_body.md
-          echo "" >> issue_body.md
-          echo "### 测试统计" >> issue_body.md
-          echo "" >> issue_body.md
-          echo "| 类型 | 数量 |" >> issue_body.md
-          echo "|------|------|" >> issue_body.md
-          echo "| ✅ 通过 | ${PASSED_TESTS} |" >> issue_body.md
-          echo "| ❌ 失败 | ${FAILED_TESTS} |" >> issue_body.md
-          echo "| 📊 总计 | ${TOTAL_TESTS} |" >> issue_body.md
-          echo "" >> issue_body.md
-          echo "---" >> issue_body.md
-          echo "" >> issue_body.md
-          echo "## ❌ 失败的测试用例" >> issue_body.md
-          echo "" >> issue_body.md
-          echo "\`${FAILED_LIST}\`" >> issue_body.md
-          echo "" >> issue_body.md
-          echo "---" >> issue_body.md
-          echo "" >> issue_body.md
-          echo "## 📝 错误详情" >> issue_body.md
-          echo "" >> issue_body.md
-          echo '```' >> issue_body.md
-          echo "${ERROR_MSG}" >> issue_body.md
-          echo '```' >> issue_body.md
-          echo "" >> issue_body.md
-          echo "---" >> issue_body.md
-          echo "" >> issue_body.md
-          echo "## 📸 自动捕获的资源" >> issue_body.md
-          echo "" >> issue_body.md
-          echo "| 资源类型 | 说明 |" >> issue_body.md
-          echo "|----------|------|" >> issue_body.md
-          echo "| 🖼️ 页面截图 | 失败时的完整页面截图 |" >> issue_body.md
-          echo "| 🎬 测试视频 | 测试过程录屏 |" >> issue_body.md
-          echo "| 📄 页面源码 | 失败时的 HTML 源码 |" >> issue_body.md
-          echo "" >> issue_body.md
-          echo "**📥 下载地址**: [Actions Artifacts](${RUN_URL})" >> issue_body.md
-          echo "" >> issue_body.md
-          echo "---" >> issue_body.md
-          echo "" >> issue_body.md
-          echo "## 🔧 处理建议" >> issue_body.md
-          echo "" >> issue_body.md
-          echo "1. **查看日志**: 点击上方运行日志链接分析失败原因" >> issue_body.md
-          echo "2. **分析截图**: 下载 Artifact 中的截图查看失败时的页面状态" >> issue_body.md
-          echo "3. **本地复现**: 使用 \`docker run -d -p 3000:3000 bkimminich/juice-shop\` 启动应用" >> issue_body.md
-          echo "4. **定位修复**: 根据错误信息修复测试或业务代码" >> issue_body.md
-          echo "5. **提交 PR**: 使用 \`fixes #issue编号\` 格式提交修复 PR" >> issue_body.md
-          echo "" >> issue_body.md
-          echo "---" >> issue_body.md
-          echo "" >> issue_body.md
-          echo "> 🤖 *此 Issue 由 GitHub Actions 自动创建*" >> issue_body.md
-          echo "> 🧪 测试框架: pytest + Playwright" >> issue_body.md
-          echo "> 📱 类型: UI 自动化测试" >> issue_body.md
-          
-          PRIORITY="priority-medium"
-          PRIORITY_EMOJI="🟡"
-          if [ "$FAILED_TESTS" -ge 5 ]; then
-            PRIORITY="priority-critical"
-            PRIORITY_EMOJI="🔴"
-          elif [ "$FAILED_TESTS" -ge 3 ]; then
-            PRIORITY="priority-high"
-            PRIORITY_EMOJI="🟠"
-          fi
-          
-          gh issue create \
-            --title "${PRIORITY_EMOJI}【测试失败】运行 #${RUN_NUMBER}" \
-            --body-file issue_body.md \
-            --label "bug,auto-reported,testing,${PRIORITY}" \
-            2>/dev/null || echo "Issue 创建失败或已存在"
