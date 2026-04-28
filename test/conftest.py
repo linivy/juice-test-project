@@ -126,14 +126,6 @@ def pytest_runtest_makereport(item, call):
                     f.write(page.content())
                 print(f"📄 HTML 源码已保存: {html_path}")
                 
-                # 3. 保存控制台日志
-                logs = page.evaluate("() => console.logs ? console.logs.join('\n') : 'No console logs'")
-                if logs and logs != "No console logs":
-                    log_path = f"test-results/logs/{test_name}_{timestamp}.log"
-                    with open(log_path, "w", encoding="utf-8") as f:
-                        f.write(logs)
-                    print(f"📝 控制台日志已保存: {log_path}")
-                    
             except Exception as e:
                 print(f"⚠️ 截图时发生错误: {str(e)}")
         
