@@ -44,7 +44,8 @@ def close_cookie_banner(page: Page):
 def close_challenge_dialog(page: Page):
     """关闭挑战成功弹窗"""
     try:
-        close_btn = page.locator(".mat-mdc-dialog-surface button[aria-label='Close'], .mat-dialog-actions button")
+        # 找到挑战弹窗的关闭按钮
+        close_btn = page.locator(".mat-mdc-dialog-surface button[aria-label='Close'], .mat-dialog-actions button, button[mat-dialog-close]")
         if close_btn.is_visible(timeout=2000):
             close_btn.click()
             page.wait_for_timeout(500)
@@ -68,10 +69,18 @@ def test_search_exact_match(logged_in_page: Page):
     page.wait_for_timeout(2000)
     close_challenge_dialog(page)  # 搜索后可能出现新的挑战弹窗
     
-    # 使用更精确的商品卡片选择器，排除挑战消息
-    products = page.locator("mat-card, .mat-card, div[class*='card'][class*='product']")
+    # 使用更精确的选择器，排除挑战消息卡片（挑战卡片有 accent-notification 类）
+    products = page.locator("mat-card:not(.accent-notification):not(.ng-star-inserted), .mat-card:not(.accent-notification)")
+    
+    # 如果没有找到匹配的元素，回退到更通用的选择器
+    if products.count() == 0:
+        products = page.locator("mat-card, .mat-card")
+    
     expect(products.first).to_be_visible(timeout=10000)
-    expect(products.first).to_contain_text("Apple Juice")
+    
+    # 验证文本时忽略挑战消息
+    product_text = products.first.inner_text()
+    assert "Apple Juice" in product_text or "apple juice" in product_text.lower(), f"产品文本不包含 'Apple Juice': {product_text[:100]}..."
 
 
 def test_search_partial_match(logged_in_page: Page):
