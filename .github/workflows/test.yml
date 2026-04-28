@@ -32,26 +32,206 @@ jobs:
       - name: Wait for Juice Shop
         run: sleep 10
       
-      - name: Run tests
+      - name: Run tests with screenshot on failure
         id: tests
-        continue-on-error: true
         run: |
+          # 运行测试，失败时自动截图
           pytest test/ -v --tb=short 2>&1 | tee test-output.txt
-          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+          EXIT_CODE=${PIPESTATUS[0]}
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+          exit $EXIT_CODE
 
-      - name: Create Issue on failure
-        if: steps.tests.outputs.exit_code != '0' && github.event_name == 'push'
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-artifacts
+          path: |
+            test-results/screenshots/**/*.png
+            test-results/videos/**/*.webm
+            test-results/logs/**/*.log
+            test-output.txt
+          retention-days: 7
+
+      - name: Generate failure summary
+        if: always()
+        id: failure_summary
+        run: |
+          # 提取失败测试信息
+          FAILED_TESTS=$(grep "FAILED" test-output.txt | head -5)
+          ERROR_DETAILS=$(grep -A 10 "FAILED" test-output.txt | head -30)
+          TEST_COUNT=$(grep -c "PASSED\|FAILED" test-output.txt)
+          PASS_COUNT=$(grep -c "PASSED" test-output.txt)
+          FAIL_COUNT=$(grep -c "FAILED" test-output.txt)
+          
+          echo "failed_tests<<EOF" >> $GITHUB_OUTPUT
+          echo "$FAILED_TESTS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          echo "error_details<<EOF" >> $GITHUB_OUTPUT
+          echo "$ERROR_DETAILS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          echo "test_count=$TEST_COUNT" >> $GITHUB_OUTPUT
+          echo "pass_count=$PASS_COUNT" >> $GITHUB_OUTPUT
+          echo "fail_count=$FAIL_COUNT" >> $GITHUB_OUTPUT
+
+      - name: Create formatted Issue on failure
+        if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           RUN_NUMBER: ${{ github.run_number }}
+          REPO: ${{ github.repository }}
+          ACTOR: ${{ github.actor }}
+          BRANCH: ${{ github.ref_name }}
+          COMMIT: ${{ github.sha }}
+          FAILED_TESTS: ${{ steps.failure_summary.outputs.failed_tests }}
+          ERROR_DETAILS: ${{ steps.failure_summary.outputs.error_details }}
+          PASS_COUNT: ${{ steps.failure_summary.outputs.pass_count }}
+          FAIL_COUNT: ${{ steps.failure_summary.outputs.fail_count }}
         run: |
-          # 切换到仓库目录（确保有 .git）
-          cd ${{ github.workspace }}
-          
-          FAILED_TESTS=$(grep "FAILED" test-output.txt | head -10 || echo "未知测试")
-          
-          gh issue create \
-            --title "[自动化Bug] 测试失败 - 运行 #${RUN_NUMBER}" \
-            --body "## 🐛 测试失败报告\n\n**运行链接**: ${RUN_URL}\n\n**失败的测试**:\n\`\`\`\n${FAILED_TESTS}\n\`\`\`\n\n请查看日志确认失败原因。" \
-            --label "bug,auto-reported"
+          # 只在测试失败且是 push 事件时创建 issue
+          if [ "${{ steps.tests.outputs.exit_code }}" != "0" ] && [ "${{ github.event_name }}" = "push" ]; then
+            
+            # 计算失败率
+            FAIL_RATE=$(echo "scale=2; ${{ steps.failure_summary.outputs.fail_count }} / ${{ steps.failure_summary.outputs.test_count }} * 100" | bc)
+            
+            # 根据失败数量确定优先级标签
+            if [ "${{ steps.failure_summary.outputs.fail_count }}" -ge 5 ]; then
+              PRIORITY_LABEL="priority-critical"
+              PRIORITY_EMOJI="🔴"
+            elif [ "${{ steps.failure_summary.outputs.fail_count }}" -ge 3 ]; then
+              PRIORITY_LABEL="priority-high"
+              PRIORITY_EMOJI="🟠"
+            elif [ "${{ steps.failure_summary.outputs.fail_count }}" -ge 1 ]; then
+              PRIORITY_LABEL="priority-medium"
+              PRIORITY_EMOJI="🟡"
+            else
+              PRIORITY_LABEL="priority-low"
+              PRIORITY_EMOJI="🟢"
+            fi
+            
+            # 提取失败模块
+            MODULE=$(echo "${{ steps.failure_summary.outputs.failed_tests }}" | head -1 | cut -d'/' -f2 | cut -d'.' -f1)
+            
+            # 构建规范的 Issue 内容
+            cat > issue_body.md << EOF
+## 🐛 Bug 描述
+
+测试执行失败，${PRIORITY_EMOJI} **${PRIORITY_LABEL#priority-}** 优先级
+
+---
+
+## 📊 测试概览
+
+| 指标 | 详情 |
+|------|------|
+| 📋 运行编号 | [${RUN_NUMBER}](${RUN_URL}) |
+| 🔀 触发方式 | ${{ github.event_name }} |
+| 🌿 分支 | ${BRANCH} |
+| 📝 提交 | [${COMMIT:0:7}](https://github.com/${REPO}/commit/${COMMIT}) |
+| 👤 触发用户 | @${ACTOR} |
+| 📈 失败率 | ${FAIL_RATE}% |
+
+### 测试统计
+
+| 类型 | 数量 |
+|------|------|
+| ✅ 通过 | ${{ steps.failure_summary.outputs.pass_count }} |
+| ❌ 失败 | ${{ steps.failure_summary.outputs.fail_count }} |
+| 📊 总计 | ${{ steps.failure_summary.outputs.test_count }} |
+
+---
+
+## ❌ 失败的测试用例
+
+\`\`\`
+${FAILED_TESTS}
+\`\`\`
+
+---
+
+## 📝 错误详情
+
+\`\`\`
+${ERROR_DETAILS}
+\`\`\`
+
+---
+
+## 📸 自动捕获的资源
+
+| 资源类型 | 说明 |
+|----------|------|
+| 🖼️ 页面截图 | 失败时的完整页面截图 |
+| 🎬 测试视频 | 测试过程录屏 |
+| 📄 页面源码 | 失败时的 HTML 源码 |
+| 📝 控制台日志 | 浏览器控制台输出 |
+
+**📥 下载地址**: [${RUN_URL}#artifacts](${RUN_URL}#artifacts)
+
+---
+
+## 🔄 复现步骤
+
+```bash
+# 1. 克隆仓库
+git clone https://github.com/${REPO}.git
+cd $(basename ${REPO})
+
+# 2. 切换到失败提交
+git checkout ${COMMIT}
+
+# 3. 安装依赖
+pip install pytest pytest-playwright
+playwright install chromium
+
+# 4. 启动 Juice Shop
+docker run -d -p 3000:3000 bkimminich/juice-shop
+sleep 10
+
+# 5. 运行失败的测试
+pytest test/${MODULE}/ -v
+```
+
+---
+
+## 🔗 相关链接
+
+- 📊 [查看详细运行日志](${RUN_URL})
+- 📁 [查看失败测试代码](https://github.com/${REPO}/tree/${COMMIT}/test/${MODULE})
+- 🌐 [Juice Shop 应用](http://localhost:3000)
+
+---
+
+## 🔧 处理建议
+
+1. **查看日志**: 点击上方链接查看详细失败日志
+2. **分析截图**: 下载 Artifact 中的截图分析页面状态
+3. **本地复现**: 使用上方"复现步骤"在本地复现问题
+4. **定位修复**: 根据错误信息定位并修复代码
+5. **提交 PR**: 使用 `fixes #N` 格式提交修复 PR
+
+---
+
+> 🤖 *此 Issue 由 GitHub Actions 自动创建*
+> 🧪 测试框架: pytest + Playwright
+> 📱 类型: UI 自动化测试
+> ⏰ 创建时间: $(date -u)
+EOF
+
+            # 创建 Issue（尝试使用优先级标签，如果不存在则忽略）
+            gh issue create \
+              --title "${PRIORITY_EMOJI} [自动化Bug] 测试失败 - ${MODULE} - 运行 #${RUN_NUMBER}" \
+              --body-file issue_body.md \
+              --label "bug,auto-reported,testing,${PRIORITY_LABEL}" 2>/dev/null || \
+            gh issue create \
+              --title "${PRIORITY_EMOJI} [自动化Bug] 测试失败 - ${MODULE} - 运行 #${RUN_NUMBER}" \
+              --body-file issue_body.md \
+              --label "bug,auto-reported,testing"
+            
+            echo "✅ Issue 创建成功！"
+          else
+            echo "不需要创建 Issue (exit_code: ${{ steps.tests.outputs.exit_code }}, event: ${{ github.event_name }})"
+          fi
