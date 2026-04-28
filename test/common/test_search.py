@@ -92,7 +92,7 @@ def test_search_no_match(logged_in_page: Page):
     page.wait_for_timeout(2000)
     
     # 验证显示 "No results found" 提示
-    no_results_message = page.locator("text='No results'", has_text="No results")
+    no_results_message = page.locator("text='No results found'", has_text="No results found")
     expect(no_results_message.first).to_be_visible(timeout=5000)
     
     # 验证提示文本完整（使用 get_by_text 方法）
