@@ -59,91 +59,86 @@ jobs:
           REPO_URL: ${{ github.server_url }}/${{ github.repository }}
           COMMIT_SHA: ${{ github.sha }}
         run: |
-          # 获取测试统计
           TOTAL_TESTS=$(grep -E "passed|failed" test-output.txt | tail -1 | grep -oP '\d+' | head -1 || echo "0")
           PASSED_TESTS=$(grep -E "passed" test-output.txt | tail -1 | grep -oP '\d+(?= passed)' || echo "0")
           FAILED_TESTS=$(grep "FAILED" test-output.txt | wc -l)
           FAILED_LIST=$(grep "FAILED" test-output.txt | head -5 | awk '{print $1}' | tr '\n' ', ')
           ERROR_MSG=$(grep -A 3 "FAILED" test-output.txt | grep -E "AssertionError|TimeoutError" | head -1 | cut -c 1-200)
           
-          # 计算失败率
           if [ "$TOTAL_TESTS" -gt 0 ]; then
             FAILURE_RATE=$(echo "scale=2; $FAILED_TESTS * 100 / $TOTAL_TESTS" | bc)
           else
             FAILURE_RATE="0"
           fi
           
-          # 构建 Issue 内容
-          cat > issue_body.md << EOF
-## 🐛 Bug 描述
-
-测试执行失败，**${FAILED_TESTS}** 个测试未通过
-
----
-
-## 📊 测试概览
-
-| 指标 | 详情 |
-|------|------|
-| 📋 运行编号 | [#${RUN_NUMBER}](${RUN_URL}) |
-| 🔀 触发方式 | push |
-| 🌿 分支 | main |
-| 📝 提交 | [${COMMIT_SHA::7}](${REPO_URL}/commit/${COMMIT_SHA}) |
-| 👤 触发用户 | @${ACTOR} |
-| 📈 失败率 | ${FAILURE_RATE}% |
-
-### 测试统计
-
-| 类型 | 数量 |
-|------|------|
-| ✅ 通过 | ${PASSED_TESTS} |
-| ❌ 失败 | ${FAILED_TESTS} |
-| 📊 总计 | ${TOTAL_TESTS} |
-
----
-
-## ❌ 失败的测试用例
-
-\`${FAILED_LIST}\`
-
----
-
-## 📝 错误详情
-
-\`\`\`
-${ERROR_MSG}
-\`\`\`
-
----
-
-## 📸 自动捕获的资源
-
-| 资源类型 | 说明 |
-|----------|------|
-| 🖼️ 页面截图 | 失败时的完整页面截图 |
-| 🎬 测试视频 | 测试过程录屏 |
-| 📄 页面源码 | 失败时的 HTML 源码 |
-
-**📥 下载地址**: [Actions Artifacts](${RUN_URL})
-
----
-
-## 🔧 处理建议
-
-1. **查看日志**: 点击上方运行日志链接分析失败原因
-2. **分析截图**: 下载 Artifact 中的截图查看失败时的页面状态
-3. **本地复现**: 使用 \`docker run -d -p 3000:3000 bkimminich/juice-shop\` 启动应用
-4. **定位修复**: 根据错误信息修复测试或业务代码
-5. **提交 PR**: 使用 \`fixes #issue编号\` 格式提交修复 PR
-
----
-
-> 🤖 *此 Issue 由 GitHub Actions 自动创建*
-> 🧪 测试框架: pytest + Playwright
-> 📱 类型: UI 自动化测试
-EOF
-
-          # 确定优先级标签
+          # 直接用 echo 生成 Issue 内容，避免 heredoc 问题
+          echo "## 🐛 Bug 描述" > issue_body.md
+          echo "" >> issue_body.md
+          echo "测试执行失败，**${FAILED_TESTS}** 个测试未通过" >> issue_body.md
+          echo "" >> issue_body.md
+          echo "---" >> issue_body.md
+          echo "" >> issue_body.md
+          echo "## 📊 测试概览" >> issue_body.md
+          echo "" >> issue_body.md
+          echo "| 指标 | 详情 |" >> issue_body.md
+          echo "|------|------|" >> issue_body.md
+          echo "| 📋 运行编号 | [#${RUN_NUMBER}](${RUN_URL}) |" >> issue_body.md
+          echo "| 🔀 触发方式 | push |" >> issue_body.md
+          echo "| 🌿 分支 | main |" >> issue_body.md
+          echo "| 📝 提交 | [${COMMIT_SHA::7}](${REPO_URL}/commit/${COMMIT_SHA}) |" >> issue_body.md
+          echo "| 👤 触发用户 | @${ACTOR} |" >> issue_body.md
+          echo "| 📈 失败率 | ${FAILURE_RATE}% |" >> issue_body.md
+          echo "" >> issue_body.md
+          echo "### 测试统计" >> issue_body.md
+          echo "" >> issue_body.md
+          echo "| 类型 | 数量 |" >> issue_body.md
+          echo "|------|------|" >> issue_body.md
+          echo "| ✅ 通过 | ${PASSED_TESTS} |" >> issue_body.md
+          echo "| ❌ 失败 | ${FAILED_TESTS} |" >> issue_body.md
+          echo "| 📊 总计 | ${TOTAL_TESTS} |" >> issue_body.md
+          echo "" >> issue_body.md
+          echo "---" >> issue_body.md
+          echo "" >> issue_body.md
+          echo "## ❌ 失败的测试用例" >> issue_body.md
+          echo "" >> issue_body.md
+          echo "\`${FAILED_LIST}\`" >> issue_body.md
+          echo "" >> issue_body.md
+          echo "---" >> issue_body.md
+          echo "" >> issue_body.md
+          echo "## 📝 错误详情" >> issue_body.md
+          echo "" >> issue_body.md
+          echo '```' >> issue_body.md
+          echo "${ERROR_MSG}" >> issue_body.md
+          echo '```' >> issue_body.md
+          echo "" >> issue_body.md
+          echo "---" >> issue_body.md
+          echo "" >> issue_body.md
+          echo "## 📸 自动捕获的资源" >> issue_body.md
+          echo "" >> issue_body.md
+          echo "| 资源类型 | 说明 |" >> issue_body.md
+          echo "|----------|------|" >> issue_body.md
+          echo "| 🖼️ 页面截图 | 失败时的完整页面截图 |" >> issue_body.md
+          echo "| 🎬 测试视频 | 测试过程录屏 |" >> issue_body.md
+          echo "| 📄 页面源码 | 失败时的 HTML 源码 |" >> issue_body.md
+          echo "" >> issue_body.md
+          echo "**📥 下载地址**: [Actions Artifacts](${RUN_URL})" >> issue_body.md
+          echo "" >> issue_body.md
+          echo "---" >> issue_body.md
+          echo "" >> issue_body.md
+          echo "## 🔧 处理建议" >> issue_body.md
+          echo "" >> issue_body.md
+          echo "1. **查看日志**: 点击上方运行日志链接分析失败原因" >> issue_body.md
+          echo "2. **分析截图**: 下载 Artifact 中的截图查看失败时的页面状态" >> issue_body.md
+          echo "3. **本地复现**: 使用 \`docker run -d -p 3000:3000 bkimminich/juice-shop\` 启动应用" >> issue_body.md
+          echo "4. **定位修复**: 根据错误信息修复测试或业务代码" >> issue_body.md
+          echo "5. **提交 PR**: 使用 \`fixes #issue编号\` 格式提交修复 PR" >> issue_body.md
+          echo "" >> issue_body.md
+          echo "---" >> issue_body.md
+          echo "" >> issue_body.md
+          echo "> 🤖 *此 Issue 由 GitHub Actions 自动创建*" >> issue_body.md
+          echo "> 🧪 测试框架: pytest + Playwright" >> issue_body.md
+          echo "> 📱 类型: UI 自动化测试" >> issue_body.md
+          
           PRIORITY="priority-medium"
           PRIORITY_EMOJI="🟡"
           if [ "$FAILED_TESTS" -ge 5 ]; then
@@ -154,7 +149,6 @@ EOF
             PRIORITY_EMOJI="🟠"
           fi
           
-          # 创建 Issue
           gh issue create \
             --title "${PRIORITY_EMOJI}【测试失败】运行 #${RUN_NUMBER}" \
             --body-file issue_body.md \
