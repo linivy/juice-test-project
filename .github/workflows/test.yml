@@ -1,11 +1,30 @@
 name: Run Tests
 
 on:
+  # 推送到 main 分支时触发冒烟测试（排除文档文件）
   push:
     branches: [ main ]
+    paths-ignore:
+      - 'README.md'
+      - '**.md'
+      - '.gitignore'
+  
+  # Pull Request 时触发关键路径测试
   pull_request:
     branches: [ main ]
+  
+  # 手动触发（支持选择测试级别）
   workflow_dispatch:
+    inputs:
+      test_level:
+        description: '选择测试级别'
+        required: true
+        default: 'smoke'
+        type: choice
+        options:
+          - 'smoke'      # 冒烟测试 (~30秒)
+          - 'critical'   # 关键路径测试 (~2分钟)
+          - 'regression' # 回归测试 (~5分钟)
 
 jobs:
   test:
@@ -13,6 +32,9 @@ jobs:
     permissions:
       contents: read
       issues: write
+      pull-requests: write
+    timeout-minutes: 10
+    
     steps:
       - uses: actions/checkout@v4
       
@@ -32,10 +54,30 @@ jobs:
       - name: Wait for Juice Shop
         run: sleep 10
       
+      - name: Determine test scope
+        id: scope
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "test_path=test/smoke/" >> $GITHUB_OUTPUT
+            echo "test_level=smoke" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "test_path=test/smoke/ test/forms/ test/list/ test/common/" >> $GITHUB_OUTPUT
+            echo "test_level=critical" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event.inputs.test_level }}" = "smoke" ]; then
+            echo "test_path=test/smoke/" >> $GITHUB_OUTPUT
+            echo "test_level=smoke" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event.inputs.test_level }}" = "critical" ]; then
+            echo "test_path=test/smoke/ test/forms/ test/list/ test/common/" >> $GITHUB_OUTPUT
+            echo "test_level=critical" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event.inputs.test_level }}" = "regression" ]; then
+            echo "test_path=test/" >> $GITHUB_OUTPUT
+            echo "test_level=regression" >> $GITHUB_OUTPUT
+          fi
+      
       - name: Run tests
         id: tests
         run: |
-          pytest test/ -v --tb=short 2>&1 | tee test-output.txt
+          pytest ${{ steps.scope.outputs.test_path }} -v --tb=short 2>&1 | tee test-output.txt
           EXIT_CODE=${PIPESTATUS[0]}
           echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
           exit $EXIT_CODE
@@ -44,22 +86,52 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-artifacts
+          name: test-artifacts-${{ steps.scope.outputs.test_level }}
           path: |
             test-results/
             test-output.txt
           retention-days: 7
 
-      - name: Create Issue on failure
-        if: always()
+      - name: Create Issue on push failure
+        if: steps.tests.outputs.exit_code != '0' && github.event_name == 'push'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           RUN_NUMBER: ${{ github.run_number }}
-          ACTOR: ${{ github.actor }}
         run: |
-          if [ "${{ steps.tests.outputs.exit_code }}" != "0" ] && [ "${{ github.event_name }}" = "push" ]; then
-            FAILED=$(grep "FAILED" test-output.txt | head -5)
-            echo "## 🐛 测试失败报告\n\n**运行链接**: ${RUN_URL}\n**触发用户**: @${ACTOR}\n**测试结果**: $(grep -E "passed|failed" test-output.txt | tail -1)\n\n**失败的测试**:\n\`\`\`\n${FAILED}\n\`\`\`\n\n---\n*此 Issue 由 GitHub Actions 自动创建*" > issue_body.md
-            gh issue create --title "[自动化Bug] 测试失败 - 运行 #${RUN_NUMBER}" --body-file issue_body.md --label "bug"
-          fi
+          FAILED=$(grep "FAILED" test-output.txt | head -5)
+          echo "## 🐛 测试失败报告
+**运行链接**: ${RUN_URL}
+**测试级别**: ${{ steps.scope.outputs.test_level }}
+
+### 失败的测试
+\`\`\`
+${FAILED}
+\`\`\`
+
+---
+*此 Issue 由 GitHub Actions 自动创建*" > issue_body.md
+          
+          gh issue create \
+            --title "[自动化Bug] 测试失败 - 运行 #${RUN_NUMBER}" \
+            --body-file issue_body.md \
+            --label "bug"
+
+      - name: Comment on PR failure
+        if: steps.tests.outputs.exit_code != '0' && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          FAILED=$(grep "FAILED" test-output.txt | head -3)
+          echo "## ❌ 测试失败
+**测试级别**: ${{ steps.scope.outputs.test_level }}
+**运行链接**: [查看详情](${RUN_URL})
+
+### 失败的测试
+\`\`\`
+${FAILED}
+\`\`\`" > pr_comment.md
+          
+          gh pr comment ${PR_NUMBER} --body-file pr_comment.md
