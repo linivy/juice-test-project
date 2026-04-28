@@ -116,7 +116,7 @@ jobs:
             MODULE=$(echo "${{ steps.failure_summary.outputs.failed_tests }}" | head -1 | cut -d'/' -f2 | cut -d'.' -f1)
             
             # 构建规范的 Issue 内容
-            cat > issue_body.md << EOF
+            cat > issue_body.md << 'EOF'
 ## 🐛 Bug 描述
 
 测试执行失败，${PRIORITY_EMOJI} **${PRIORITY_LABEL#priority-}** 优先级
@@ -146,17 +146,17 @@ jobs:
 
 ## ❌ 失败的测试用例
 
-\`\`\`
+```
 ${FAILED_TESTS}
-\`\`\`
+```
 
 ---
 
 ## 📝 错误详情
 
-\`\`\`
+```
 ${ERROR_DETAILS}
-\`\`\`
+```
 
 ---
 
