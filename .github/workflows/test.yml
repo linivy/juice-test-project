@@ -56,9 +56,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           RUN_NUMBER: ${{ github.run_number }}
+          ACTOR: ${{ github.actor }}
         run: |
           if [ "${{ steps.tests.outputs.exit_code }}" != "0" ] && [ "${{ github.event_name }}" = "push" ]; then
-            FAILED=$(grep "FAILED" test-output.txt | head -3)
-            echo "测试失败: ${RUN_URL}\n失败用例:\n${FAILED}" > issue_body.md
+            FAILED=$(grep "FAILED" test-output.txt | head -5)
+            echo "## 🐛 测试失败报告\n\n**运行链接**: ${RUN_URL}\n**触发用户**: @${ACTOR}\n**测试结果**: $(grep -E "passed|failed" test-output.txt | tail -1)\n\n**失败的测试**:\n\`\`\`\n${FAILED}\n\`\`\`\n\n---\n*此 Issue 由 GitHub Actions 自动创建*" > issue_body.md
             gh issue create --title "[自动化Bug] 测试失败 - 运行 #${RUN_NUMBER}" --body-file issue_body.md --label "bug"
           fi
