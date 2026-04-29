@@ -1,0 +1,10 @@
+{
+  "valid_user": {
+    "email": "admin@juice-sh.op",
+    "password": "admin123"
+  },
+  "invalid_user": {
+    "email": "invalid@example.com",
+    "password": "wrongpass"
+  }
+}
