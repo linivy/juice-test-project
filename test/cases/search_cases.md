@@ -1,25 +1,36 @@
 # 搜索功能测试点
 
 ## 功能概述
-用户登录后可以搜索商品
+用户登录后可以通过关键词搜索商品
 
-## 测试点列表
+## 自动化覆盖情况
+| 测试点 | 自动化文件 | 函数名 | 状态 |
+|--------|-----------|--------|------|
+| TC-SEARCH-001 | test_search.py | test_search_exact_match | ✅ 已自动化 |
+| TC-SEARCH-002 | test_search.py | test_search_partial_match | ✅ 已自动化 |
+| TC-SEARCH-003 | test_search.py | test_search_no_match | ✅ 已自动化 |
+| TC-SEARCH-004 | test_search.py | test_search_empty_string | ✅ 已自动化 |
+| TC-SEARCH-005 | test_product_list.py | test_product_list_search | ✅ 已自动化 |
 
-### P0 - 核心功能
-- [ ] TC-SEARCH-001: 搜索存在的商品，显示结果
-- [ ] TC-SEARCH-002: 搜索不存在的商品，显示无结果提示
-- [ ] TC-SEARCH-003: 空搜索，显示所有商品
-
-### P1 - 边界测试
-- [ ] TC-SEARCH-004: 搜索超长关键词（100+字符）
-- [ ] TC-SEARCH-005: 搜索特殊字符（@#$%）
-- [ ] TC-SEARCH-006: 大小写混合搜索
-
-### P2 - 交互测试
-- [ ] TC-SEARCH-007: 按 Enter 键搜索
-- [ ] TC-SEARCH-008: 点击搜索图标搜索
-- [ ] TC-SEARCH-009: 清空搜索框后自动重置
+## 未自动化的测试点
+- [ ] TC-SEARCH-006: 搜索后点击搜索结果跳转详情
+- [ ] TC-SEARCH-007: 搜索历史记录
+- [ ] TC-SEARCH-008: 热门搜索词推荐
+- [ ] TC-SEARCH-009: 搜索建议下拉框
+- [ ] TC-SEARCH-010: 中英文混合搜索
 
 ## BDD 格式
+### TC-SEARCH-001
+Given 用户已登录
+When 用户输入 "Apple Juice" 并搜索
+Then 搜索结果中显示 "Apple Juice"
 
-### TC-SEARCH-001: 搜索存在的商品
+### TC-SEARCH-002
+Given 用户已登录
+When 用户输入 "Apple" 并搜索
+Then 显示所有包含 "Apple" 的商品
+
+### TC-SEARCH-003
+Given 用户已登录
+When 用户输入 "NonExistent" 并搜索
+Then 显示 "No results found"
