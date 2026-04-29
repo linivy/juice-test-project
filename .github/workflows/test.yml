@@ -2,14 +2,21 @@ name: Run Tests
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - 'main'
+      - 'milestone/**'
+      - 'release/**'
+      - 'feature/**'
     paths-ignore:
       - 'README.md'
       - '**.md'
       - '.gitignore'
   
   pull_request:
-    branches: [ main ]
+    branches:
+      - 'main'
+      - 'milestone/**'
+      - 'release/**'
   
   workflow_dispatch:
     inputs:
@@ -53,22 +60,41 @@ jobs:
       - name: Determine test scope
         id: scope
         run: |
-          if [ "${{ github.event_name }}" = "push" ]; then
-            echo "test_path=test/smoke/" >> $GITHUB_OUTPUT
-            echo "test_level=smoke" >> $GITHUB_OUTPUT
+          BRANCH_NAME="${{ github.ref_name }}"
+          TEST_PATH=""
+          TEST_LEVEL=""
+          
+          # 根据分支名确定测试级别
+          if [[ "$BRANCH_NAME" =~ ^milestone/ ]]; then
+            TEST_PATH="test/"
+            TEST_LEVEL="regression"
+          elif [[ "$BRANCH_NAME" =~ ^release/ ]]; then
+            TEST_PATH="test/smoke/ test/forms/ test/list/ test/common/"
+            TEST_LEVEL="critical"
+          elif [[ "$BRANCH_NAME" =~ ^feature/ ]] || [ "$BRANCH_NAME" = "main" ]; then
+            TEST_PATH="test/smoke/"
+            TEST_LEVEL="smoke"
           elif [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "test_path=test/smoke/ test/forms/ test/list/ test/common/" >> $GITHUB_OUTPUT
-            echo "test_level=critical" >> $GITHUB_OUTPUT
+            TEST_PATH="test/smoke/ test/forms/ test/list/ test/common/"
+            TEST_LEVEL="critical"
           elif [ "${{ github.event.inputs.test_level }}" = "smoke" ]; then
-            echo "test_path=test/smoke/" >> $GITHUB_OUTPUT
-            echo "test_level=smoke" >> $GITHUB_OUTPUT
+            TEST_PATH="test/smoke/"
+            TEST_LEVEL="smoke"
           elif [ "${{ github.event.inputs.test_level }}" = "critical" ]; then
-            echo "test_path=test/smoke/ test/forms/ test/list/ test/common/" >> $GITHUB_OUTPUT
-            echo "test_level=critical" >> $GITHUB_OUTPUT
+            TEST_PATH="test/smoke/ test/forms/ test/list/ test/common/"
+            TEST_LEVEL="critical"
           elif [ "${{ github.event.inputs.test_level }}" = "regression" ]; then
-            echo "test_path=test/" >> $GITHUB_OUTPUT
-            echo "test_level=regression" >> $GITHUB_OUTPUT
+            TEST_PATH="test/"
+            TEST_LEVEL="regression"
+          else
+            TEST_PATH="test/smoke/"
+            TEST_LEVEL="smoke"
           fi
+          
+          echo "test_path=$TEST_PATH" >> $GITHUB_OUTPUT
+          echo "test_level=$TEST_LEVEL" >> $GITHUB_OUTPUT
+          echo "确定测试级别: $TEST_LEVEL"
+          echo "确定测试路径: $TEST_PATH"
       
       - name: Run tests
         id: tests
@@ -94,10 +120,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           RUN_NUMBER: ${{ github.run_number }}
+          BRANCH: ${{ github.ref_name }}
         run: |
           FAILED=$(grep "FAILED" test-output.txt | head -3 | tr '\n' ';')
-          echo "测试失败: ${RUN_URL}\n测试级别: ${{ steps.scope.outputs.test_level }}\n失败用例: ${FAILED}" > issue_body.md
-          gh issue create --title "[自动化Bug] 测试失败 - 运行 #${RUN_NUMBER}" --body-file issue_body.md --label "bug"
+          echo "## 🐛 测试失败报告\n**运行链接**: ${RUN_URL}\n**运行编号**: #${RUN_NUMBER}\n**测试级别**: ${{ steps.scope.outputs.test_level }}\n**分支**: ${BRANCH}\n\n### 失败的测试\n\n\`${FAILED}\`\n\n---\n*此 Issue 由 GitHub Actions 自动创建*" > issue_body.md
+          gh issue create --title "[自动化Bug] ${{ steps.scope.outputs.test_level }} 测试失败 - 运行 #${RUN_NUMBER}" --body-file issue_body.md --label "bug" 2>/dev/null || echo "Issue 创建失败或已存在"
 
       - name: Comment on PR failure
         if: steps.tests.outputs.exit_code != '0' && github.event_name == 'pull_request'
@@ -107,5 +134,5 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           FAILED=$(grep "FAILED" test-output.txt | head -3 | tr '\n' ';')
-          echo "测试失败: [查看详情](${RUN_URL})\n测试级别: ${{ steps.scope.outputs.test_level }}\n失败用例: ${FAILED}" > pr_comment.md
+          echo "## ❌ 测试失败\n**测试级别**: ${{ steps.scope.outputs.test_level }}\n**运行链接**: [查看详情](${RUN_URL})\n\n### 失败的测试\n\n\`${FAILED}\`\n\n请点击上方链接查看详细日志。" > pr_comment.md
           gh pr comment ${PR_NUMBER} --body-file pr_comment.md

@@ -59,7 +59,7 @@ def test_product_card_fields(logged_in_page: Page):
     
     # ========== 故意失败的断言（用于测试 GitHub Actions 创建 issue）==========
     # 取消注释下面这行来触发失败
-    assert "NonExistentText" in product_text, "故意失败的测试 - 用于测试 issue 创建流程"
+    # assert "NonExistentText" in product_text, "故意失败的测试 - 用于测试 issue 创建流程"
 
 
 def test_product_add_to_basket(logged_in_page: Page):
