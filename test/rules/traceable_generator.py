@@ -1,68 +1,74 @@
-# test/rules/traceable_generator.py
-"""
-带追溯性的测试用例生成器（简化版）
-"""
+# 读取 conftest.py
+"""test/conftest.py"""
+import pytest
+from playwright.sync_api import Page, Browser, BrowserContext
+import os
+import time
 
-from datetime import datetime
-from typing import List, Dict
+BASE_URL = os.getenv("JUICE_SHOP_URL", "http://localhost:3000")
 
 
-class TraceableTestCaseGenerator:
-    """支持追溯性的测试用例生成器"""
+@pytest.fixture(scope="session")
+def browser():
+    """创建浏览器实例"""
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        yield browser
+        browser.close()
+
+
+@pytest.fixture
+def context(browser: Browser):
+    """创建浏览器上下文"""
+    context = browser.new_context()
+    yield context
+    context.close()
+
+
+@pytest.fixture
+def page(context: BrowserContext):
+    """创建页面实例"""
+    page = context.new_page()
+    yield page
+
+
+@pytest.fixture
+def mock_page(page: Page):
+    """提供带有 Mock 支持的页面"""
+    yield page
+    page.unroute("**/*")
+
+
+@pytest.fixture
+def logged_in_page(page: Page):
+    """已登录的页面 fixture"""
+    page.goto(f"{BASE_URL}/#/login")
+    page.fill("#email", "admin@juice-sh.op")
+    page.fill("#password", "admin123")
+    page.press("#password", "Enter")
+    page.wait_for_url(f"{BASE_URL}/#/search", timeout=10000)
+    yield page
+
+
+@pytest.hookimpl(tryfirst=True, hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    """测试失败时自动截图"""
+    outcome = yield
+    report = outcome.get_result()
     
-    def __init__(self, module_name: str, feature_name: str):
-        self.module_name = module_name
-        self.feature_name = feature_name
-        self.test_points: List[Dict] = []
-    
-    def add_test_point(self, tp_id: str, name: str, priority: str = "P1"):
-        """添加功能测试点"""
-        self.test_points.append({
-            "id": tp_id,
-            "name": name,
-            "priority": priority,
-            "test_cases": []
-        })
-    
-    def generate_file_header(self) -> str:
-        """生成文件头（包含追溯矩阵）"""
-        matrix = "\n".join([
-            f"| {tp['id']} | {tp['name']} | {tp['priority']} |"
-            for tp in self.test_points
-        ])
+    if report.when == "call" and report.failed:
+        page = None
+        for fixture in item.fixturenames:
+            if fixture == "page" or fixture == "mock_page":
+                page = item.funcargs.get(fixture)
+                break
         
-        return f'''
-"""
-{self.module_name} - {self.feature_name} 自动化测试
-
-测试覆盖矩阵:
-| 功能测试点ID | 功能描述 | 优先级 |
-|-------------|---------|--------|
-{matrix}
-
-生成时间: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-"""
-'''
-    
-    def generate_test_case(self, tp_id: str, tp_name: str, code: str) -> str:
-        """生成带追溯标记的测试用例"""
-        return f'''
-    @allure.feature("{self.module_name}")
-    @allure.story("{self.feature_name}")
-    @allure.title("{tp_id}: {tp_name}")
-    def test_{self.feature_name.lower()}_{tp_id.lower()}(self, page):
-        """
-        【{tp_id}】{tp_name}
-        
-        测试目标: 验证{tp_name}
-        """
-        {code}
-'''
-
-
-if __name__ == "__main__":
-    generator = TraceableTestCaseGenerator("登录", "表单验证")
-    generator.add_test_point("TC-LOGIN-001", "登录页面加载", "P0")
-    generator.add_test_point("TC-LOGIN-002", "有效凭据登录", "P0")
-    
-    print(generator.generate_file_header())
+        if page:
+            screenshot_dir = "test-results/screenshots"
+            os.makedirs(screenshot_dir, exist_ok=True)
+            test_name = item.name.replace("[", "_").replace("]", "_")
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            screenshot_path = f"{screenshot_dir}/{test_name}_{timestamp}.png"
+            page.screenshot(path=screenshot_path, full_page=True)
+            print(f"测试失败，截图已保存到: {screenshot_path}")
