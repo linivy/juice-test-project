@@ -1,0 +1,53 @@
+# .codebuddy/rules/test_case_generation_rules.yaml
+# 测试用例生成规则
+
+name: "pytest_playwright_test_generation"
+version: "1.0.0"
+description: "自动化生成 pytest + playwright 测试用例的规则"
+
+# 追溯性规则
+traceability:
+  enabled: true
+  test_point_format: "TC-{MODULE}-{NUMBER}"
+  examples:
+    - "TC-LOGIN-001"
+    - "TC-SEARCH-001"
+
+# 命名规范
+naming:
+  test_file: "test_{module}_{feature}.py"
+  test_class: "Test{Module}{Feature}"
+  basic_test: "test_{feature}_{test_point_id}"
+  parametrized_test: "test_{feature}_param_{test_point_id}"
+
+# 参数化策略
+parametrization:
+  strategies:
+    - condition: "data_count <= 5"
+      strategy: "inline"
+    - condition: "5 < data_count <= 10"
+      strategy: "inline_with_comments"
+    - condition: "10 < data_count <= 30"
+      strategy: "external_json"
+    - condition: "data_count > 30"
+      strategy: "dynamic"
+    - condition: "shared_across_tests"
+      strategy: "fixture"
+
+# 文档要求
+documentation:
+  file_header_required: true
+  docstring_required_fields:
+    - "测试点ID"
+    - "测试目标"
+    - "前置条件"
+    - "测试步骤"
+    - "预期结果"
+
+# Allure 元数据
+allure:
+  required_labels:
+    - "@allure.feature"
+    - "@allure.story"
+    - "@allure.title"
+    - "@allure.severity"
