@@ -1,11 +1,10 @@
-"""
 # ==================== 规范同步信息 ====================
 spec_file: test/cases/ui-testing-patterns.md
 spec_version: 0.0.0
 spec_hash: no_spec
 spec_last_updated: unknown
 # ===================================================
-"""
+
 
 # ==================== 规范同步信息 ====================
 spec_file: test/cases/ui-testing-patterns.md

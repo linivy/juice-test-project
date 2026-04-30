@@ -1,17 +1,8 @@
-"""
 # ==================== 规范同步信息 ====================
-spec_file: test/cases/ui-testing-patterns.md
-spec_version: 0.0.0
-spec_hash: no_spec
-spec_last_updated: unknown
-# ===================================================
-"""
-
-# ==================== 规范同步信息 ====================
-spec_file: test/cases/ui-testing-patterns.md
-spec_version: 1.0.0
-spec_hash: e8847ce5
-spec_last_updated: 2026-01-15
+# spec_file: test/cases/ui-testing-patterns.md
+# spec_version: 1.0.0
+# spec_hash: e8847ce5
+# spec_last_updated: 2026-01-15
 # ===================================================
 
 # test/forms/test_search.py
@@ -41,27 +32,34 @@ from playwright.sync_api import Page, expect
 BASE_URL = "http://localhost:3000"
 
 def activate_search(page: Page):
-    """激活搜索框"""
-    # 方法1: 按 / 键激活
-    page.keyboard.press("/")
-    page.wait_for_timeout(300)
-    
-    # 查找搜索框
+    """激活搜索框 - 改进版"""
+    # 方法1: 直接查找搜索框（如果已经可见）
     search_input = page.locator("input[placeholder*='Search' i], input[placeholder*='search' i]")
     if search_input.count() > 0 and search_input.first.is_visible():
         return search_input.first
     
-    # 方法2: 点击搜索图标
+    # 方法2: 按 / 键激活
+    page.keyboard.press("/")
+    page.wait_for_timeout(500)
+    
+    # 再次查找搜索框
+    search_input = page.locator("input[placeholder*='Search' i], input[placeholder*='search' i], input:focus")
+    if search_input.count() > 0 and search_input.first.is_visible():
+        return search_input.first
+    
+    # 方法3: 点击搜索图标（并确保关闭图标不会遮挡）
     search_icon = page.locator("mat-icon", has_text="search")
     if search_icon.count() > 0:
-        search_icon.first.click()
+        # 等待没有关闭图标干扰
         page.wait_for_timeout(300)
+        search_icon.first.click()
+        page.wait_for_timeout(500)
         
         search_input = page.locator("input[placeholder*='Search' i]")
         if search_input.count() > 0:
             return search_input.first
     
-    # 方法3: 返回通用搜索框
+    # 方法4: 返回通用输入框
     return page.locator("input").first
 
 def close_cookie_banner(page: Page):
