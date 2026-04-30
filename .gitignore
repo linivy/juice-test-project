@@ -1,3 +1,38 @@
-__pycache__/ 
-.pytest_cache/ 
-venv/ 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+
+# 测试报告和结果
+test-reports/
+test-results/
+allure-results/
+*.html
+*.xml
+*.log
+
+# 测试截图和视频
+test-results/screenshots/
+test-results/videos/
+test-results/logs/
+
+# pytest
+.pytest_cache/
+.tox/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
