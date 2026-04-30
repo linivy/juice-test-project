@@ -2,7 +2,7 @@
 """API 客户端封装 - 支持多环境配置"""
 
 import requests
-from typing import Optional, Dict, Any
+from typing import Optional, Dict
 from dataclasses import dataclass
 
 
@@ -22,6 +22,10 @@ class APIClient:
         self.session = requests.Session()
         self.session.verify = config.verify_ssl
         self.session.timeout = config.timeout
+        self.session.headers.update({
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        })
     
     def set_auth_token(self, token: str):
         """设置认证 token"""

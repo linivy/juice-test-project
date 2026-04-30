@@ -39,7 +39,7 @@ import pytest
 from playwright.sync_api import Page, expect
 
 # 导入数据工厂
-from factories.data_factory import TestDataFactory
+from test.factories.data_factory import TestDataFactory
 
 BASE_URL = "http://localhost:3000"
 

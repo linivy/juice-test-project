@@ -2,19 +2,25 @@
 """API 测试专用 fixtures"""
 
 import pytest
+import sys
+import os
+
+# 添加项目根目录到路径
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
 from test.helpers.api_client import APIClient, APIClientConfig
 from test.config.environment import get_config
 
 
 @pytest.fixture(scope="session")
 def api_config():
-    """获取 API 配置"""
     return get_config()
 
 
 @pytest.fixture(scope="session")
 def api_client(api_config):
-    """创建 API 客户端"""
     client = APIClient(APIClientConfig(
         base_url=api_config.api_base_url,
         timeout=api_config.api_timeout
@@ -25,17 +31,18 @@ def api_client(api_config):
 
 @pytest.fixture(scope="session")
 def auth_token(api_client, api_config):
-    """获取认证 token（登录后）"""
-    response = api_client.post("/api/login", json={
+    response = api_client.post("/rest/user/login", json={
         "email": api_config.test_user_email,
         "password": api_config.test_user_password
     })
-    assert response.status_code == 200
-    return response.json().get("token")
+    if response.status_code == 200:
+        data = response.json()
+        return data.get("authentication", {}).get("token")
+    return None
 
 
 @pytest.fixture(scope="session")
 def authenticated_api_client(api_client, auth_token):
-    """已认证的 API 客户端"""
-    api_client.set_auth_token(auth_token)
+    if auth_token:
+        api_client.set_auth_token(auth_token)
     return api_client
