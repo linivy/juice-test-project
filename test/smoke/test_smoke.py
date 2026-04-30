@@ -1,10 +1,25 @@
+"""
+# ==================== 规范同步信息 ====================
+spec_file: test/cases/ui-testing-patterns.md
+spec_version: 0.0.0
+spec_hash: no_spec
+spec_last_updated: unknown
+# ===================================================
+"""
+
+# ==================== 规范同步信息 ====================
+spec_file: test/cases/ui-testing-patterns.md
+spec_version: 1.0.0
+spec_hash: e8847ce5
+spec_last_updated: 2026-01-15
+# ===================================================
+
 # test/smoke/test_smoke.py
 """冒烟测试套件 - 核心功能验证"""
 import pytest
 from playwright.sync_api import Page, expect
 
 BASE_URL = "http://localhost:3000"
-
 
 def close_dialogs(page: Page):
     """关闭弹窗"""
@@ -23,7 +38,6 @@ def close_dialogs(page: Page):
                 page.wait_for_timeout(500)
     except:
         pass
-
 
 @pytest.mark.smoke
 def test_login_smoke(page: Page):
@@ -50,7 +64,6 @@ def test_login_smoke(page: Page):
     current_url = page.url
     assert "search" in current_url or "home" in current_url or "#/" in current_url, f"登录后未跳转到预期页面: {current_url}"
 
-
 @pytest.mark.smoke
 def test_search_smoke(logged_in_page: Page):
     """冒烟测试：搜索功能"""
@@ -63,7 +76,6 @@ def test_search_smoke(logged_in_page: Page):
         
         products = page.locator(".mat-card")
         expect(products.first).to_be_visible()
-
 
 @pytest.mark.smoke
 def test_orders_smoke(logged_in_page: Page):

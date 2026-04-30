@@ -1,0 +1,59 @@
+name: Check Spec Sync
+
+on:
+  push:
+    branches: [main, master, develop]
+    paths:
+      - 'test/cases/ui-testing-patterns.md'
+      - 'test/**/test_*.py'
+      - 'scripts/check_spec_sync.py'
+  pull_request:
+    branches: [main, master]
+    paths:
+      - 'test/cases/ui-testing-patterns.md'
+      - 'test/**/test_*.py'
+
+jobs:
+  check-spec-sync:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies (if needed)
+        run: |
+          # 脚本只需要 Python 标准库，不需要额外依赖
+          python --version
+      
+      - name: Check spec sync status
+        id: check
+        run: |
+          python scripts/check_spec_sync.py
+        continue-on-error: true
+      
+      - name: Upload check results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spec-check-report
+          path: |
+            scripts/check_spec_sync.py
+            test/cases/ui-testing-patterns.md
+      
+      - name: Fail if check failed
+        if: steps.check.outcome == 'failure'
+        run: |
+          echo "❌ 规范同步检查失败！"
+          echo "请运行: python scripts/check_spec_sync.py --add-markers --force"
+          exit 1
+      
+      - name: Success message
+        if: steps.check.outcome == 'success'
+        run: |
+          echo "✅ 所有测试文件与规范同步"

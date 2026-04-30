@@ -1,10 +1,18 @@
+"""
+# ==================== 规范同步信息 ====================
+spec_file: test/cases/ui-testing-patterns.md
+spec_version: 1.0.0
+spec_hash: e8847ce5
+spec_last_updated: 2026-01-15
+# ===================================================
+"""
+
 # test/rules/test_generator.py
 """
 智能测试生成器 - 根据数据特征自动选择策略
 """
 
 from parameterization_rules import ParameterizationRuleEngine, ParameterizationStrategy
-
 
 class SmartTestGenerator:
     """智能测试生成器 - 根据数据特征自动选择策略"""
@@ -191,7 +199,6 @@ def {test_name}(self, {params_str}):
             data_obj.dynamic = False
         
         return data_obj
-
 
 # ==================== 使用示例 ====================
 

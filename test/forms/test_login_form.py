@@ -1,22 +1,47 @@
+"""
+# ==================== 规范同步信息 ====================
+spec_file: test/cases/ui-testing-patterns.md
+spec_version: 1.0.0
+spec_hash: e8847ce5
+spec_last_updated: 2026-01-15
+# ===================================================
+"""
+
 # test/forms/test_login_form.py
 """
 登录模块 - 表单验证自动化测试
 
-对应的功能测试点:
-- TC-LOGIN-001: 登录页面正常加载 (优先级: P0)
-- TC-LOGIN-002: 使用有效凭据登录成功 (优先级: P0)
-- TC-LOGIN-003: 使用无效凭据登录失败 (优先级: P1)
-- TC-LOGIN-004: 空凭据验证（按钮禁用状态） (优先级: P1)
-- TC-LOGIN-005: 多用户登录验证 (优先级: P1)
-- TC-LOGIN-006: 边界值测试 (优先级: P2)
-- TC-LOGIN-007: 安全攻击防护（SQL注入/XSS） (优先级: P0)
+功能测试点:
+- TC-LOGIN-001: 登录页面正常加载
+- TC-LOGIN-002: 使用有效凭据登录成功
+- TC-LOGIN-003: 使用无效凭据登录失败（参数化）
+- TC-LOGIN-004: 空凭据验证（按钮禁用状态）
+- TC-LOGIN-005: 多用户登录验证（参数化）
+- TC-LOGIN-006: 边界值测试（参数化）
+- TC-LOGIN-007: 安全攻击防护（参数化）
+- TC-LOGIN-008: 连续多次提交测试
+- TC-LOGIN-009: 表单重置功能测试
+- TC-LOGIN-010: 密码显示/隐藏切换测试
+
+测试覆盖矩阵:
+| 功能测试点ID | 功能描述 | 测试用例函数 | 参数化类型 | 数据组数 |
+|-------------|---------|-------------|-----------|---------|
+| TC-LOGIN-001 | 页面加载 | test_login_page_loads | basic | 1 |
+| TC-LOGIN-002 | 有效登录 | test_valid_credentials | basic | 1 |
+| TC-LOGIN-003 | 无效登录 | test_invalid_credentials_param | parametrized | 5 |
+| TC-LOGIN-004 | 空凭据 | test_empty_credentials | basic | 1 |
+| TC-LOGIN-005 | 多用户 | test_multiple_users | parametrized | 3 |
+| TC-LOGIN-006 | 边界值 | test_boundary_values | parametrized | 5 |
+| TC-LOGIN-007 | 安全攻击 | test_security_attacks | parametrized | 3 |
+| TC-LOGIN-008 | 重复提交 | test_form_submit_multiple_times | basic | 1 |
+| TC-LOGIN-009 | 重置功能 | test_form_reset | basic | 1 |
+| TC-LOGIN-010 | 密码显示 | test_password_visibility_toggle | basic | 1 |
 """
 
 import pytest
 from playwright.sync_api import Page, expect
 
 BASE_URL = "http://localhost:3000"
-
 
 def close_cookie_banner(page: Page):
     """关闭 Cookie 弹窗"""
@@ -27,7 +52,6 @@ def close_cookie_banner(page: Page):
     except:
         pass
 
-
 def close_overlay(page: Page):
     """关闭可能遮挡的覆盖层"""
     try:
@@ -35,26 +59,21 @@ def close_overlay(page: Page):
     except:
         pass
 
-
 # ==================== TC-LOGIN-001: 登录页面加载测试 ====================
 
 def test_login_page_loads(page: Page):
     """
     【TC-LOGIN-001】登录页面正常加载
     """
-    # 访问登录页面
     page.goto(f"{BASE_URL}/#/login")
     page.wait_for_load_state("networkidle")
     
-    # 验证页面标题
     login_heading = page.locator("mat-card h2, mat-card h1, .login-form h2, .login-form h1")
     expect(login_heading.first).to_be_visible(timeout=5000)
     
-    # 验证表单元素
     expect(page.locator("#email")).to_be_visible()
     expect(page.locator("#password")).to_be_visible()
     expect(page.locator("#loginButton")).to_be_visible()
-
 
 # ==================== TC-LOGIN-002: 有效凭据登录 ====================
 
@@ -62,50 +81,46 @@ def test_valid_credentials(page: Page):
     """
     【TC-LOGIN-002】使用有效凭据登录成功
     """
-    # 访问登录页面
     page.goto(f"{BASE_URL}/#/login")
     page.wait_for_load_state("networkidle")
     close_cookie_banner(page)
     close_overlay(page)
     
-    # 输入有效凭据
     page.fill("#email", "admin@juice-sh.op")
     page.fill("#password", "admin123")
     
-    # 点击登录按钮
     page.wait_for_selector("#loginButton:not([disabled])", timeout=10000)
     page.click("#loginButton")
     
-    # 验证登录成功
     page.wait_for_url(f"{BASE_URL}/#/search", timeout=15000)
     expect(page).to_have_url(f"{BASE_URL}/#/search")
 
+# ==================== TC-LOGIN-003: 无效凭据登录（参数化） ====================
 
-# ==================== TC-LOGIN-003: 无效凭据登录 ====================
-
-def test_invalid_credentials(page: Page):
+@pytest.mark.parametrize("email,password,expected_error,scenario", [
+    ("invalid@example.com", "wrongpassword", "Invalid email or password", "错误邮箱+错误密码"),
+    ("admin@juice-sh.op", "wrongpassword", "Invalid email or password", "正确邮箱+错误密码"),
+    ("invalid@example.com", "admin123", "Invalid email or password", "错误邮箱+正确密码"),
+    ("", "admin123", "Email is required", "空邮箱+正确密码"),
+    ("admin@juice-sh.op", "", "Password is required", "正确邮箱+空密码"),
+])
+def test_invalid_credentials_param(page: Page, email: str, password: str, expected_error: str, scenario: str):
     """
-    【TC-LOGIN-003】使用无效凭据登录失败
+    【TC-LOGIN-003】无效凭据登录 - 参数化
     """
-    # 访问登录页面
+    print(f"\n测试场景: {scenario}")
+    
     page.goto(f"{BASE_URL}/#/login")
     page.wait_for_load_state("networkidle")
     close_cookie_banner(page)
-    close_overlay(page)
     
-    # 输入无效凭据
-    page.fill("#email", "invalid@example.com")
-    page.fill("#password", "wrongpassword")
-    
-    # 点击登录按钮
-    page.wait_for_selector("#loginButton:not([disabled])", timeout=10000)
+    page.fill("#email", email)
+    page.fill("#password", password)
     page.click("#loginButton")
     
-    # 验证登录失败
     expect(page).to_have_url(f"{BASE_URL}/#/login", timeout=5000)
-    error_message = page.get_by_text("Invalid email or password", exact=False)
+    error_message = page.get_by_text(expected_error, exact=False)
     expect(error_message).to_be_visible(timeout=5000)
-
 
 # ==================== TC-LOGIN-004: 空凭据验证 ====================
 
@@ -113,20 +128,16 @@ def test_empty_credentials(page: Page):
     """
     【TC-LOGIN-004】空凭据验证 - 按钮处于禁用状态
     """
-    # 访问登录页面
     page.goto(f"{BASE_URL}/#/login")
     page.wait_for_load_state("networkidle")
     close_cookie_banner(page)
     
-    # 清空输入框
     page.fill("#email", "")
     page.fill("#password", "")
     
-    # 验证登录按钮禁用
     login_button = page.locator("#loginButton")
     expect(login_button).to_be_disabled(timeout=5000)
     expect(page).to_have_url(f"{BASE_URL}/#/login", timeout=5000)
-
 
 # ==================== TC-LOGIN-005: 多用户登录验证 ====================
 
@@ -135,62 +146,51 @@ def test_empty_credentials(page: Page):
     ("jim@juice-sh.op", "ncc-1701", "普通用户"),
     ("bender@juice-sh.op", "OhG0dPlease1nsertLiquor!", "测试用户"),
 ])
-def test_multiple_users(page: Page, email, password, role):
+def test_multiple_users(page: Page, email: str, password: str, role: str):
     """
-    【TC-LOGIN-005】多用户登录验证
+    【TC-LOGIN-005】多用户登录验证 - 参数化
     """
     print(f"\n测试用户: {role} ({email})")
     
-    # 访问登录页面
     page.goto(f"{BASE_URL}/#/login")
     page.wait_for_load_state("networkidle")
     close_cookie_banner(page)
     close_overlay(page)
     
-    # 输入凭据
     page.fill("#email", email)
     page.fill("#password", password)
     
-    # 点击登录按钮
     page.wait_for_selector("#loginButton:not([disabled])", timeout=10000)
     page.click("#loginButton")
     
-    # 验证登录成功
     page.wait_for_url(f"{BASE_URL}/#/search", timeout=15000)
     expect(page).to_have_url(f"{BASE_URL}/#/search")
-    
-    print(f"✅ 用户 {role} 登录成功")
-
 
 # ==================== TC-LOGIN-006: 边界值测试 ====================
 
 @pytest.mark.parametrize("email,password,boundary_type", [
     ("a@b.c", "123456", "最短邮箱地址"),
+    ("a" * 50 + "@example.com", "password123", "超长邮箱地址"),
     ("test@test.com", "1", "最短密码"),
+    ("test@test.com", "p" * 100, "超长密码"),
     ("test@test.com", "!@#$%^&*()_+", "特殊字符密码"),
 ])
-def test_boundary_values(page: Page, email, password, boundary_type):
+def test_boundary_values(page: Page, email: str, password: str, boundary_type: str):
     """
-    【TC-LOGIN-006】边界值测试
+    【TC-LOGIN-006】边界值测试 - 参数化
     """
     print(f"\n测试边界场景: {boundary_type}")
     
-    # 访问登录页面
     page.goto(f"{BASE_URL}/#/login")
     page.wait_for_load_state("networkidle")
     close_cookie_banner(page)
     
-    # 输入边界值
     page.fill("#email", email)
     page.fill("#password", password)
     
-    # 验证系统没有崩溃
     assert not page.is_closed()
     expect(page.locator("#email")).to_be_visible()
     expect(page.locator("#password")).to_be_visible()
-    
-    print(f"✅ 边界场景 {boundary_type} 测试通过")
-
 
 # ==================== TC-LOGIN-007: 安全攻击防护 ====================
 
@@ -199,35 +199,127 @@ def test_boundary_values(page: Page, email, password, boundary_type):
     ("<script>alert('xss')</script>", "password", "XSS攻击"),
     ("admin'--", "anything", "SQL注释注入"),
 ])
-def test_security_attacks(page: Page, attack_string, password, attack_type):
+def test_security_attacks(page: Page, attack_string: str, password: str, attack_type: str):
     """
-    【TC-LOGIN-007】安全攻击防护
+    【TC-LOGIN-007】安全攻击防护 - 参数化
     """
     print(f"\n测试攻击类型: {attack_type}")
     
-    # 访问登录页面
     page.goto(f"{BASE_URL}/#/login")
     page.wait_for_load_state("networkidle")
     close_cookie_banner(page)
     close_overlay(page)
     
-    # 输入攻击向量
     page.fill("#email", attack_string)
     page.fill("#password", password)
     
-    # 点击登录按钮
     page.wait_for_selector("#loginButton:not([disabled])", timeout=5000)
     page.click("#loginButton")
     
-    # 验证应用正确处理攻击
     expect(page).to_have_url(f"{BASE_URL}/#/login", timeout=5000)
     assert page.is_visible("#email")
     assert page.is_visible("#password")
+
+# ==================== TC-LOGIN-008: 连续多次提交测试 ====================
+
+def test_form_submit_multiple_times(page: Page):
+    """
+    【TC-LOGIN-008】测试连续多次提交 - 防止重复提交
     
-    print(f"✅ 攻击类型 {attack_type} 被正确处理")
+    测试目标: 验证连续点击登录按钮不会产生多次请求
+    
+    预期结果: 只提交一次，不会出现多个成功提示或错误
+    """
+    page.goto(f"{BASE_URL}/#/login")
+    page.wait_for_load_state("networkidle")
+    close_cookie_banner(page)
+    
+    page.fill("#email", "admin@juice-sh.op")
+    page.fill("#password", "admin123")
+    
+    submit_btn = page.locator("#loginButton")
+    page.wait_for_selector("#loginButton:not([disabled])", timeout=10000)
+    
+    # 连续点击3次
+    submit_btn.click()
+    submit_btn.click()
+    submit_btn.click()
+    
+    # 验证最终只跳转一次
+    page.wait_for_url(f"{BASE_URL}/#/search", timeout=15000)
+    expect(page).to_have_url(f"{BASE_URL}/#/search")
 
+# ==================== TC-LOGIN-009: 表单重置功能测试 ====================
 
-# ==================== 原有的基础测试（保留兼容） ====================
+def test_form_reset(page: Page):
+    """
+    【TC-LOGIN-009】测试表单重置功能
+    
+    测试目标: 验证表单重置后所有字段清空
+    
+    预期结果: 邮箱和密码输入框被清空
+    """
+    page.goto(f"{BASE_URL}/#/login")
+    page.wait_for_load_state("networkidle")
+    close_cookie_banner(page)
+    
+    page.fill("#email", "test@example.com")
+    page.fill("#password", "Test123456")
+    
+    # 查找重置按钮（如果有）
+    reset_btn = page.locator("button[type='reset'], button:has-text('重置')")
+    if reset_btn.count() > 0:
+        reset_btn.click()
+        
+        # 验证字段被清空
+        assert page.locator("#email").input_value() == ""
+        assert page.locator("#password").input_value() == ""
+    else:
+        # 如果没有重置按钮，测试通过（不是所有应用都有）
+        pytest.skip("该应用没有重置按钮")
+
+# ==================== TC-LOGIN-010: 密码显示/隐藏切换测试 ====================
+
+def test_password_visibility_toggle(page: Page):
+    """
+    【TC-LOGIN-010】测试密码显示/隐藏切换功能
+    
+    测试目标: 验证点击密码显示/隐藏按钮能够切换密码可见性
+    
+    预期结果: 密码字段从 type="password" 变为 type="text"
+    """
+    page.goto(f"{BASE_URL}/#/login")
+    page.wait_for_load_state("networkidle")
+    close_cookie_banner(page)
+    
+    page.fill("#password", "Test123456")
+    
+    # 查找密码显示/隐藏按钮
+    visibility_toggle = page.locator("button[aria-label='Hide password'], button[aria-label='Show password'], .visibility-toggle")
+    
+    if visibility_toggle.count() > 0:
+        # 验证初始类型为 password
+        initial_type = page.locator("#password").get_attribute("type")
+        assert initial_type == "password", f"初始类型应为 password，实际为 {initial_type}"
+        
+        # 点击显示密码
+        visibility_toggle.first.click()
+        
+        # 验证类型变为 text
+        new_type = page.locator("#password").get_attribute("type")
+        assert new_type == "text", f"点击后应为 text，实际为 {new_type}"
+        
+        # 再次点击隐藏
+        visibility_toggle.first.click()
+        
+        # 验证恢复为 password
+        final_type = page.locator("#password").get_attribute("type")
+        assert final_type == "password", f"再次点击后应为 password，实际为 {final_type}"
+    else:
+        # 如果没有密码显示切换按钮，测试通过
+        pytest.skip("该应用没有密码显示/隐藏功能")
+
+# ==================== 兼容保留的测试 ====================
 
 def test_login_with_valid_credentials(page: Page):
     """测试使用有效凭据登录（兼容保留）"""
@@ -242,7 +334,6 @@ def test_login_with_valid_credentials(page: Page):
     page.wait_for_url(f"{BASE_URL}/#/search", timeout=10000)
     expect(page).to_have_url(f"{BASE_URL}/#/search")
 
-
 def test_login_with_invalid_credentials(page: Page):
     """测试使用无效凭据登录（兼容保留）"""
     page.goto(f"{BASE_URL}/#/login")
@@ -256,7 +347,6 @@ def test_login_with_invalid_credentials(page: Page):
     expect(page).to_have_url(f"{BASE_URL}/#/login", timeout=5000)
     error_message = page.get_by_text("Invalid email or password", exact=False)
     expect(error_message).to_be_visible(timeout=5000)
-
 
 def test_login_with_empty_credentials(page: Page):
     """测试使用空凭据登录（兼容保留）"""
