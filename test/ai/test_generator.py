@@ -341,7 +341,7 @@ class AITestGenerator:
                 all_test_code.append(f"# ========== P1 批次 {i} ==========\n{code}")
         
         # 分批生成 P2 代码（可选，P2 可以少一些）
-        if p2_points and len(p2_points) <= 10:
+        if p2_points and len(p2_points) <= 50:
             print(f"\n🔧 生成 P2 测试代码...")
             code = self.generate_batch_code(p2_points[:10], module_name, feature_name)
             all_test_code.append(f"# ========== P2 ==========\n{code}")
