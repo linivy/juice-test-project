@@ -57,7 +57,7 @@ class AITestGenerator:
         return '\n'.join(cleaned)
     
     def _fix_indentation(self, code: str) -> str:
-        """修复缩进 - 区分装饰器、方法定义和方法体"""
+        """修复缩进 - 正确处理 for 循环内的代码"""
         lines = code.split('\n')
         fixed = []
         in_class = False
@@ -75,33 +75,48 @@ class AITestGenerator:
             if stripped.startswith('class '):
                 in_class = True
                 in_method = False
+                in_for_loop = False
                 fixed.append(line)
                 continue
             
             # 装饰器或方法定义
             if in_class and (stripped.startswith('@') or stripped.startswith('def ')):
                 in_method = True
-                fixed.append('    ' + stripped)
+                in_for_loop = False
+                if not line.startswith('    '):
+                    fixed.append('    ' + line.lstrip())
+                else:
+                    fixed.append(line)
                 continue
             
             # 方法体
             if in_method:
-                # 检测 for 循环
+                # 检测 for 循环开始
                 if stripped.startswith('for '):
                     in_for_loop = True
-                    fixed.append('        ' + stripped)
+                    if not line.startswith('        '):
+                        fixed.append('        ' + line.lstrip())
+                    else:
+                        fixed.append(line)
+                # for 循环内的代码（包括 assert）
                 elif in_for_loop:
-                    # for 循环内的代码，12空格
-                    fixed.append('            ' + stripped)
-                    # 检测 for 循环结束
-                    if not stripped or stripped.startswith('@') or stripped.startswith('def '):
+                    # for 循环内的代码需要 12 空格缩进
+                    if not line.startswith('            '):
+                        fixed.append('            ' + line.lstrip())
+                    else:
+                        fixed.append(line)
+                    # 检测 for 循环结束（空行或新的非缩进行）
+                    if not stripped or stripped.startswith(('@', 'def ', 'class ')):
                         in_for_loop = False
                 else:
-                    # 普通方法体代码，8空格
-                    fixed.append('        ' + stripped)
+                    # 普通方法体代码，8 空格
+                    if not line.startswith('        '):
+                        fixed.append('        ' + line.lstrip())
+                    else:
+                        fixed.append(line)
                 
                 # 检测方法结束
-                if stripped == 'pass' or (stripped and not stripped.startswith(' ') and not stripped.startswith('#')):
+                if stripped == 'pass' or (stripped and not stripped.startswith(('@', 'def ', 'for ', 'class ')) and len(stripped) < 3):
                     in_method = False
                     in_for_loop = False
             else:
@@ -112,20 +127,39 @@ class AITestGenerator:
     
     def _clean_generated_code(self, code: str) -> str:
         """清理生成的代码"""
-        # 去除 BOM
-        if code.startswith('\ufeff'):
-            code = code[1:]
+        if not code:
+            return code
         
-        # 移除 markdown 代码块标记
-        code = re.sub(r'^```python\s*\n', '', code, flags=re.MULTILINE)
-        code = re.sub(r'\n```\s*$', '', code)
+        # 1. 移除 markdown 代码块标记
+        code = re.sub(r'^```python\s*\n?', '', code, flags=re.MULTILINE)
+        code = re.sub(r'```\s*\n?', '', code)
         code = code.replace('```python', '').replace('```', '')
         
-        # 清理重复的 import
+        # 2. 移除 AI 返回的 "python" 分隔符（重要！）
+        code = re.sub(r'^\s*python\s*\n?', '', code, flags=re.MULTILINE)
+        # 移除行中单独的 "python" 单词（前面有空格的情况）
+        code = re.sub(r'\n\s*python\s*\n', '\n', code)
+        
+        # 3. 移除其他标记
+        code = code.replace('[COMPLETE]', '')
+        
+        # 4. 修复选择器
+        code = self._fix_selectors(code)
+        
+        # 5. 修复断言语法
+        code = self._fix_assertion_syntax(code)
+        
+        # 6. 修复缩进
+        code = self._fix_indentation(code)
+        
+        # 7. 清理导入
         code = self._clean_imports(code)
         
-        # 修复缩进
-        code = self._fix_indentation(code)
+        # 8. 清理多余空行
+        code = re.sub(r'\n{3,}', '\n\n', code)
+        
+        # 9. 确保文件以换行结束
+        code = code.rstrip() + '\n'
         
         return code
     
@@ -545,6 +579,9 @@ def test_{tc_id}_create_activity_success(self, page):
 
         # 10. 修复错误的文件上传选择器
         fixed = fixed.replace('#formAttachment', '#fileInput')
+
+        # 11. 修复放弃创建时的确认按钮
+        fixed = fixed.replace('#btnConfirmCancel', '#btnConfirm')
         
         return fixed
     
@@ -753,7 +790,7 @@ def test_{tc_id}_create_activity_success(self, page):
             '    def wait_for_toast(self, page, timeout=3000):',
             '        """等待toast消息"""',
             '        try:',
-            '            page.wait_for_selector(".toast-message, .toast", timeout=timeout)',
+            '            page.wait_for_selector("#toast", timeout=timeout)',
             '            page.wait_for_timeout(500)',
             '        except:',
             '            pass',
