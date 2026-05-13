@@ -1,5 +1,5 @@
 # test/ai/prompts.py
-"""AI 提示词模板 - 通用版（适用于所有项目）"""
+"""AI 提示词模板 - 支持代码完整性约束"""
 
 # ==================== 项目上下文模板 ====================
 PROJECT_CONTEXT_TEMPLATE = """
@@ -7,7 +7,7 @@ PROJECT_CONTEXT_TEMPLATE = """
 - 项目名称：{project_name}
 - 测试框架：pytest + playwright
 - 基础URL：{base_url}
-- 页面类型：{page_type}  # single_page_app 或 multi_page
+- 页面类型：{page_type}
 
 ## 页面结构说明
 {page_structure}
@@ -26,6 +26,7 @@ PROJECT_CONTEXT_TEMPLATE = """
 ## 有效测试账号
 {accounts_section}
 """
+
 # ==================== 通用测试点分类 ====================
 
 FORM_PAGE_CATEGORIES = """
@@ -84,6 +85,7 @@ FORM_PAGE_CATEGORIES = """
 - XSS攻击防护
 - 特殊字符处理
 """
+
 LIST_PAGE_CATEGORIES = """
 ### 二、列表页面测试点
 
@@ -134,6 +136,7 @@ LIST_PAGE_CATEGORIES = """
 - 普通用户只看到自己的数据
 - 已删除数据不显示
 """
+
 DETAIL_PAGE_CATEGORIES = """
 ### 三、详情页面测试点
 
@@ -202,7 +205,7 @@ SECURITY_CATEGORIES = """
 - 会话超时后需重新登录
 - 退出登录后无法访问受保护页面
 """
-# ==================== 测试点生成提示词 ====================
+# ==================== 测试点生成提示词（优化版）====================
 
 TEST_POINTS_PROMPT = """
 你是资深测试架构师，擅长设计全面的测试用例。
@@ -241,12 +244,13 @@ TEST_POINTS_PROMPT = """
 ## ⚠️ 完整性要求（必须遵守）
 1. 必须覆盖上述【测试类型清单】中的每一种类型
 2. 每个测试类型至少生成 2-3 个测试点
-3. 如果输出被截断，请分多次输出，使用 [CONTINUE] 标记继续
-4. 输出完成后，在末尾添加 [COMPLETE] 标记
-5. 不要添加额外解释，直接输出测试点列表
+3. 如果输出内容较多，请优先完成当前分组后再继续
+4. 不要在句子中间截断，确保每个测试点完整输出
+5. 输出完成后，在末尾添加 [COMPLETE] 标记
 
 不要添加额外解释，直接输出测试点列表。
 """
+
 # ==================== 测试数据生成提示词 ====================
 
 TEST_DATA_PROMPT = """
@@ -256,8 +260,8 @@ TEST_DATA_PROMPT = """
 
 输出格式：
 test_data = [
-    pytest.param("value1", "value2", {{"success": True}}, id="TC-001-描述"),
-    pytest.param("", "value2", {{"success": False, "error": "错误消息"}}, id="TC-002-描述"),
+    pytest.param("value1", "value2", {"success": True}, id="TC-001-描述"),
+    pytest.param("", "value2", {"success": False, "error": "错误消息"}, id="TC-002-描述"),
 ]
 
 要求：
@@ -267,18 +271,18 @@ test_data = [
 
 ## ⚠️ 完整性要求
 1. 必须为每个测试点生成对应的测试数据
-2. 如果输出被截断，使用 [CONTINUE] 标记继续
+2. 确保每条测试数据完整（包含所有参数）
 3. 输出完成后，在末尾添加 [COMPLETE] 标记
-"""
 
-# ==================== 代码生成提示词 ====================
+"""
+# ==================== 代码生成提示词（核心优化版）====================
 
 CODE_GENERATION_PROMPT = """
 生成 pytest + playwright 测试代码。
 
 {project_context}
 
-## 测试数据
+## 测试点列表
 {test_data}
 
 ## 模块信息
@@ -292,15 +296,19 @@ CODE_GENERATION_PROMPT = """
 3. 成功验证：URL 包含 success_url
 4. 失败验证：停留在 page_path 并检查错误消息
 5. 空字段时验证提交按钮禁用
-6. 使用 allure 装饰器（如果可用）
+6. 使用 allure 装饰器
 7. 输出纯 Python 代码，不要额外解释
+8. 🚨 不要使用 ```python 和 ``` 包裹代码，直接输出纯 Python 代码
 
-## ⚠️ 完整性要求
-1. 必须为每个测试数据生成对应的测试代码
-2. 如果输出被截断，使用 [CONTINUE] 标记继续
-3. 输出完成后，在末尾添加 [COMPLETE] 标记
+## ⚠️ 代码完整性约束（最高优先级）
+1. 每个测试方法必须有完整的函数体、闭合括号和至少一个断言
+2. 不要在方法中间截断，如果无法完成所有测试点，请完成当前方法后停止
+3. 确保所有括号、引号、方括号都已闭合
+4. 每个测试方法都以 `def test_` 开头
+5. 生成完成后，必须在最后一行添加 `[COMPLETE]` 标记
+6. 🚨 禁止在代码开头添加 ```python，禁止在代码末尾添加 ```
 
-## 代码模板
+## 代码模板（纯代码，不要包含反引号）
 import pytest
 from playwright.sync_api import Page, expect
 import allure
@@ -323,14 +331,105 @@ def wait_for_toast(page: Page):
 class Test{{module_name}}:
 
     @allure.title("测试用例")
-    @pytest.mark.parametrize("data", test_data)
-    def test_function(self, page: Page, data):
-        page.goto(f"{{BASE_URL}}{{page_path}}")
+    def test_example(self, page: Page):
+        page.goto(f"{BASE_URL}{{page_path}}")
         page.wait_for_load_state("networkidle")
         close_dialog(page)
         
         # 测试逻辑
         # ...
+        expect(page).to_have_url(lambda url: "{{success_url}}" in url)
+
+[COMPLETE]
+"""
+
+# ==================== 安全代码生成提示词（防截断版）====================
+
+SAFE_CODE_GENERATION_PROMPT = """
+生成 pytest + playwright 测试代码。
+
+{project_context}
+
+## 当前批次测试点（共 {batch_count} 个）
+{batch_points}
+
+## 模块信息
+- 模块名称：{module_name}
+- 功能名称：{feature_name}
+- 当前批次号：{batch_num}/{total_batches}
+- 基础URL：{base_url}
+- 页面路径：{page_path}
+- 成功URL：{success_url}
+
+## 代码要求
+1. 为每个测试点生成一个独立的测试方法
+2. 每个测试方法至少包含 3-5 个操作步骤和 1 个断言
+3. 使用项目配置中的选择器定位元素
+4. 包含辅助函数：close_dialog()、wait_for_toast()
+5. 使用 @allure.feature 和 @allure.title 装饰器
+6. 🚨 不要使用 ```python 和 ``` 包裹代码，直接输出纯 Python 代码
+
+## 🚨 防截断规则（必须严格遵守）
+1. 完整优先原则：宁可少生成几个完整的测试方法，也不要生成半个不完整的方法
+2. 强制结束标记：生成完成后必须输出 [COMPLETE]
+3. 括号检查：每个 ( 必须有对应的 )
+4. 断言完整：每个 expect( 必须以 ) 结束
+5. 方法边界：每个方法结束后确认闭合
+6. 🚨 禁止在代码开头添加 ```python，禁止在代码末尾添加 ```
+
+## 🚨 导入规则
+1. **禁止**导入不存在的模块如 `from conftest import page`
+2. **不要**导入 `page`，`page` 是 pytest 的 fixture，由 pytest 自动注入
+3. **只允许**导入以下模块：`pytest`, `allure`, `playwright.sync_api`, `datetime`, `time`, `os`
+4. **不要**使用 `from config import selectors` 这种导入方式，请直接使用硬编码的选择器
+
+## 代码模板（纯代码，不要包含反引号）
+import pytest
+from playwright.sync_api import Page, expect
+import allure
+
+BASE_URL = "{base_url}"
+
+def close_dialog(page: Page):
+    try:
+        page.locator(".modal-close, .dialog-close").click(timeout=2000)
+    except:
+        pass
+
+def wait_for_toast(page: Page):
+    try:
+        page.wait_for_selector(".toast-message, .toast", timeout=3000)
+    except:
+        pass
+
+@allure.feature("{feature_name}")
+class Test{module_name}:
+
+    @allure.title("TC-XXX: 测试描述")
+    def test_example(self, page: Page):
+        page.goto(f"{BASE_URL}{page_path}")
+        page.wait_for_load_state("networkidle")
+        close_dialog(page)
+        expect(page).to_have_url(lambda url: "{success_url}" in url)
+
+[COMPLETE]
+"""
+
+# ==================== 修复截断代码的提示词 ====================
+
+FIX_TRUNCATION_PROMPT = """
+以下代码被截断了，请修复并补全：
+## 修复要求
+1. 补全所有未闭合的括号
+2. 补全所有未闭合的引号
+3. 补全被截断的 assert/expect 语句
+4. 确保每个测试方法完整
+5. 输出完整的代码
+
+```python
+{truncated_code}
+```
+[COMPLETE]
 """
 # ==================== 工具函数 ====================
 
@@ -339,59 +438,36 @@ def build_project_context(config: dict) -> str:
     
     page_type = config.get("page_type", "multi_page")
     base_url = config.get("base_url", "待填写")
-    role_switch = config.get("selectors", {}).get("角色切换", "#roleSelect")
-    create_btn = config.get("selectors", {}).get("新建活动按钮", "#btnCreate")
-    submit_btn = config.get("selectors", {}).get("完成创建按钮", "#btnSubmit")
-    save_draft_btn = config.get("selectors", {}).get("保存草稿按钮", "#btnSaveDraft")
+    success_url = config.get("success_url", "待填写")
+    page_path = config.get("page_path", "待填写")
+    has_login = config.get("has_login", True)
+    selectors = config.get("selectors", {})
     
-    if page_type == "single_page_app":
-        page_structure = """
-- 这是一个单页面应用，所有功能（列表、新建、详情）都在同一个页面
-- 页面加载后直接显示活动列表
-- 点击【新建活动】按钮弹出模态框
-- 点击【详情】按钮切换到详情页视图
-- 不需要单独的登录步骤，使用右上角角色切换来测试权限
-"""
-        operation_flow = f"""
-1. 直接访问 {base_url}
-2. 如需切换角色，使用 {role_switch} 下拉框
-3. 点击 {create_btn} 打开新建活动模态框
-4. 填写表单，点击 {submit_btn} 或 {save_draft_btn}
-5. 验证列表页数据更新
-"""
+    # 获取关键选择器
+    role_switch = selectors.get("角色切换", "#roleSelect")
+    create_btn = selectors.get("新建活动按钮", "#btnCreate")
+    submit_btn = selectors.get("完成创建", "#btnSubmit")
+    save_draft_btn = selectors.get("保存草稿", "#btnSaveDraft")
+    
+    # 构建页面结构说明
+    if not has_login:
+        page_structure = "- 单页面应用，无需登录\n- 使用角色切换测试权限"
+        operation_flow = f"1. 访问 {base_url}\n2. 切换角色: {role_switch}\n3. 点击: {create_btn}\n4. 提交: {submit_btn}"
     else:
-        page_structure = "- 标准多页面应用"
-        operation_flow = "1. 访问 {page_path}\n2. 登录后操作"
-    
-    # 构建选择器部分
-    selectors_lines = []
-    for name, selector in config.get("selectors", {}).items():
-        selectors_lines.append(f"- {name}：{selector}")
-    selectors_section = "\n".join(selectors_lines) if selectors_lines else "- 请根据页面实际情况填写"
-    
-    # 构建错误消息部分
-    errors_lines = []
-    for name, msg in config.get("error_messages", {}).items():
-        errors_lines.append(f"- {name}：{msg}")
-    errors_section = "\n".join(errors_lines) if errors_lines else "- 请根据实际错误消息填写"
-    
-    # 构建账号部分
-    accounts_lines = []
-    for role, account in config.get("test_accounts", {}).items():
-        accounts_lines.append(f"- {role}：{account.get('email')} / {account.get('password')}")
-    accounts_section = "\n".join(accounts_lines) if accounts_lines else "- 请填写测试账号"
+        page_structure = "- 多页面应用，需要登录"
+        operation_flow = "1. 登录\n2. 访问功能页面"
     
     return PROJECT_CONTEXT_TEMPLATE.format(
         project_name=config.get("project_name", "未知项目"),
         base_url=base_url,
-        page_type=page_type,
+        page_type="单页面应用" if not has_login else "多页面应用",
         page_structure=page_structure,
         operation_flow=operation_flow,
-        selectors_section=selectors_section,
-        success_url=config.get("success_url", "待填写"),
-        page_path=config.get("page_path", "待填写"),
-        error_messages_section=errors_section,
-        accounts_section=accounts_section,
+        selectors_section="- 请参考 config.py 中的 selectors 配置",
+        success_url=success_url,
+        page_path=page_path,
+        error_messages_section="- 请参考 config.py 中的 error_messages 配置",
+        accounts_section="- 请参考 config.py 中的 test_accounts 配置",
     )
 
 def get_test_categories(page_type: str = "all") -> str:
@@ -409,16 +485,58 @@ def get_test_categories(page_type: str = "all") -> str:
     
     return "\n".join(categories)
 
+def get_batch_generation_prompt(
+    project_context: str,
+    batch_points: list,
+    module_name: str,
+    feature_name: str,
+    batch_num: int,
+    total_batches: int,
+    base_url: str,
+    page_path: str,
+    success_url: str
+) -> str:
+    """构建批次生成提示词"""
+    
+    batch_text = "\n".join([f"- {point}" for point in batch_points])
+    
+    return SAFE_CODE_GENERATION_PROMPT.format(
+        project_context=project_context,
+        batch_count=len(batch_points),
+        batch_points=batch_text,
+        module_name=module_name,
+        feature_name=feature_name,
+        batch_num=batch_num,
+        total_batches=total_batches,
+        base_url=base_url,
+        page_path=page_path,
+        success_url=success_url,
+    )
+
+def get_fix_truncation_prompt(truncated_code: str) -> str:
+    """构建修复截断代码的提示词"""
+    return FIX_TRUNCATION_PROMPT.format(truncated_code=truncated_code)
+
+# ==================== 导出列表 ====================
 
 __all__ = [
+    # 模板
     'PROJECT_CONTEXT_TEMPLATE',
     'FORM_PAGE_CATEGORIES',
     'LIST_PAGE_CATEGORIES',
     'DETAIL_PAGE_CATEGORIES',
     'SECURITY_CATEGORIES',
+    
+    # 提示词
     'TEST_POINTS_PROMPT',
     'TEST_DATA_PROMPT',
     'CODE_GENERATION_PROMPT',
+    'SAFE_CODE_GENERATION_PROMPT',
+    'FIX_TRUNCATION_PROMPT',
+    
+    # 工具函数
     'build_project_context',
     'get_test_categories',
+    'get_batch_generation_prompt',
+    'get_fix_truncation_prompt',
 ]

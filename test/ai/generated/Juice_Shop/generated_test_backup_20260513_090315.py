@@ -1,8 +1,6 @@
 import pytest
 from playwright.sync_api import Page, expect
 
-import allure
-from playwright.sync_api import expect
 BASE_URL = "http://localhost:3000"
 
 # 测试数据
