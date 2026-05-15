@@ -25,6 +25,10 @@ selectors:
   form_start_time: "#formStartTime"
   form_end_time: "#formEndTime"
   form_description: "#formDescription"
+
+  # 添加富文本编辑器配置
+  rich_editor_fields:
+    - form_description  # 标记这个字段是富文本编辑器
   
   # 地点选择
   location_type_online: "input[name='locationType'][value='online']"
@@ -80,7 +84,7 @@ error_element_mapping:
   form_type: "#error_formType"
   form_start_time: "#error_formStartTime"
   form_end_time: "#error_formEndTime"
-  form_description: "#error_formName"  # 活动简介可能复用活动名称的错误元素
+  form_description: ""
 
 # ==================== 示例数据（用于 prompt 中的示例）====================
 example_data:
@@ -156,11 +160,13 @@ cascade_rules:
     parent: "#formProvince"
     child: "#formCity"
     wait_condition: "#formCity option:not([value=''])"
+    wait_timeout: 500
     description: "选择省份后城市选项才会加载"
   city_district:
     parent: "#formCity"
     child: "#formDistrict"
     wait_condition: "#formDistrict option:not([value=''])"
+    wait_timeout: 500
     description: "选择城市后区县选项才会加载"
 
 # ==================== 验证规则 ====================

@@ -18,9 +18,18 @@ SYSTEM_PROMPT = (
     "   - 开始时间为空 → \"请选择开始时间\"\n"
     "   - 活动简介为空 → \"请输入活动简介\"\n"
     "2. 活动类型值：使用 community、family、other，不是显示文本\n"
-    "3. 级联选择：直接选择，不要使用 wait_for_selector 等待\n"
+    "3. 级联选择规则：\n"
+    "   - 活动类型→子类型：先选类型，等待#subTypeDiv可见后再选子类型\n"
+    "   - 省份→城市→区县：选择上级后等待API加载（约500ms）再选下级\n"
     "4. 保存草稿：必须填写活动名称和活动类型\n"
-    "5. 确认弹框：只在正向成功流程中等待\n"
+    "5. 确认弹框规则：\n"
+    "   - ✅ 验证通过 → 弹出确认弹框 → 点击确认\n"
+    "   - ❌ 验证失败 → 直接显示错误toast，不弹出确认弹框\n"
+    "6. 富文本编辑器处理：\n"
+    "   - 活动简介 (#formDescription) 是 contenteditable div，需要特殊处理\n"
+    "   - 使用 page.fill() 或 page.evaluate() 来填充内容\n"
+    "   - 示例：page.fill('#formDescription', '活动简介内容')\n"
+    "   - 或：page.evaluate(\"document.querySelector('#formDescription').innerHTML = '内容'\")\n"
 )
 
 
@@ -120,7 +129,9 @@ ERROR_ELEMENTS = (
     "- 开始时间错误：`#error_formStartTime`\n"
     "- 结束时间错误：`#error_formEndTime`\n"
     "- 时间范围错误：`#error_errorTimeRange`\n"
+    "- 活动简介：无独立错误元素，仅显示 toast 提示\n"
 )
+
 
 
 # ==================== 省市区级联规则 ====================

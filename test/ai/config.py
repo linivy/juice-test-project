@@ -79,9 +79,13 @@ ACTIVITY_CONFIG = {
         "toast": "#toast",
         "activity_list": "#activityTableBody",
         "role_select": "#roleSelect",
-        "sub_type_div": "#subTypeDiv",  # 添加这个
+        "sub_type_div": "#subTypeDiv",
+        "form_description": "#formDescription",
     },
     
+    # ========== 新增配置 ==========
+    "rich_editor_fields": ["form_description"],  # 标记富文本编辑器字段
+
     "error_messages": {
         "empty_name": "请输入活动名称",
         "empty_type": "请选择活动类型",
@@ -95,6 +99,7 @@ ACTIVITY_CONFIG = {
         "file_format_error": "文件格式错误",
         "file_size_error": "文件大小超过限制",
         "char_limit": "字符超限",
+        "empty_description": "请输入活动简介",
     },
     
     "success_messages": {
@@ -114,7 +119,7 @@ ACTIVITY_CONFIG = {
             },
             "家庭活动": {
                 "value": "family",
-                "sub_options": ["亲子活动", "户外露营", "亲子烘培"],
+                "sub_options": ["亲子活动", "户外露营", "亲子烘焙"],
                 "wait_selector": "#subTypeDiv"
             },
             "其他": {
@@ -143,19 +148,15 @@ ACTIVITY_CONFIG = {
         "province_city": {
             "parent": "#formProvince",
             "child": "#formCity",
-            # 修改前
-            # "wait_condition": "#formCity option:not([value=''])",
-            # 修改后
-            "wait_condition": "#formCity option",
+            "wait_condition": "#formCity option",  # 可以改成这个更宽松的条件
+            "wait_timeout": 500,  # 确保有这个字段
             "description": "选择省份后城市选项才会加载"
         },
         "city_district": {
             "parent": "#formCity",
             "child": "#formDistrict",
-            # 修改前
-            # "wait_condition": "#formDistrict option:not([value=''])",
-            # 修改后
             "wait_condition": "#formDistrict option",
+            "wait_timeout": 500,
             "description": "选择城市后区县选项才会加载"
         }
     },

@@ -677,6 +677,19 @@ class AITestGenerator:
         activity_name = test_data.get('activity_name', '测试活动')
         address = test_data.get('address', '科技园南区A栋')
         
+        # ========== 新增：处理富文本编辑器 ==========
+        rich_editor_fields = self.config.get("rich_editor_fields", [])
+
+        # 处理 form_description（contenteditable div）
+        if 'form_description' in rich_editor_fields:
+            # 将 page.fill 转换为 evaluate 方式
+            # 模式: page.fill("#formDescription", "内容") -> page.evaluate("document.querySelector('#formDescription').innerHTML = '内容'")
+            fixed = re.sub(
+                r'page\.fill\("#formDescription", "([^"]+)"\)',  # 去掉 # 前的反斜杠
+                r'page.evaluate("document.querySelector(\'#formDescription\').innerHTML = \'\1\'")',
+                fixed
+            )
+
         # 4. 修复活动类型的 option value（将显示文本转换为实际 value）
         fixed = fixed.replace('page.select_option("#formType", "社区活动")', f'page.select_option("#formType", "{activity_type_value}")')
         fixed = fixed.replace('page.select_option("#formType", "家庭活动")', 'page.select_option("#formType", "family")')
@@ -731,18 +744,20 @@ class AITestGenerator:
         
         # 9. 修复取消弹框选择器
         fixed = fixed.replace('#cancelModal', '#confirmModal')
-        fixed = fixed.replace('#btnConfirmCancel', '#btnConfirm')
+        fixed = fixed.replace('#btnConfirmCancelBtn', '#btnConfirm')
         
         # 10. 修复 CSS 选择器语法
         fixed = fixed.replace('option:not([value=""])', 'option')
         fixed = fixed.replace("option:not([value=''])", 'option')
         
         # 11. 修复严格模式问题 - 添加 .nth(1) 到 option 断言
-        fixed = re.sub(
-            r'expect\(page\.locator\("([^"]*option[^"]*)"\)\.to_contain_text\(',
-            r'expect(page.locator("\1").nth(1)).to_contain_text(',
-            fixed
-        )
+        # 只添加一次，避免重复
+        if '.nth(1)' not in fixed:
+            fixed = re.sub(
+                r'expect\(page\.locator\("([^"]*option[^"]*)"\)\.to_contain_text\(',
+                r'expect(page.locator("\1").nth(1)).to_contain_text(',
+                fixed
+            )
         
         # 12. 修复错误的断言方式（列表参数）
         fixed = re.sub(
@@ -762,6 +777,25 @@ class AITestGenerator:
                 new_lines.append('')
         fixed = '\n'.join(new_lines)
         
+        # ========== 新增：处理富文本编辑器 ==========
+        # 获取富文本字段配置
+        rich_editor_fields = self.config.get("rich_editor_fields", [])
+        
+        # 处理 form_description（contenteditable div）
+        if 'form_description' in rich_editor_fields:
+            # 将 page.fill 转换为更可靠的方式
+            # 方式1：使用 evaluate 设置 innerHTML（推荐）
+            fixed = fixed.replace(
+                'page.fill("#formDescription", "',
+                'page.evaluate("document.querySelector(\'#formDescription\').innerHTML = "'
+            )
+            # 需要修复结尾的引号
+            fixed = re.sub(
+                r'page\.evaluate\("document\.querySelector\(\'\#formDescription\'\)\.innerHTML = "([^"]+)"\)',
+                r'page.evaluate("document.querySelector(\'#formDescription\').innerHTML = \'\1\'")',
+                fixed
+            )
+
         return fixed
 
     def generate_all_methods(self, all_points: List[str], module_name: str, feature_name: str) -> List[str]:
