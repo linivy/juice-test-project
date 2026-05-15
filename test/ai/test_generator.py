@@ -374,20 +374,45 @@ class AITestGenerator:
         if not code:
             return code
         
+        # 1. 移除 markdown 代码块标记
         code = re.sub(r'^```python\s*\n?', '', code, flags=re.MULTILINE)
         code = re.sub(r'```\s*\n?', '', code)
         code = code.replace('```python', '').replace('```', '')
         
+        # 2. 移除 AI 返回的 "python" 分隔符
         code = re.sub(r'^\s*python\s*\n?', '', code, flags=re.MULTILINE)
         code = re.sub(r'\n\s*python\s*\n', '\n', code)
         
+        # 3. 移除孤立的异常行
+        lines = code.split('\n')
+        cleaned_lines = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped and not stripped.startswith('",') and stripped != '", state="visible")' and stripped != 'state="visible")':
+                cleaned_lines.append(line)
+            elif not stripped:
+                cleaned_lines.append('')
+        code = '\n'.join(cleaned_lines)
+        
+        # 4. 移除其他标记
         code = code.replace('[COMPLETE]', '')
         
+        # 5. 修复选择器
         code = self._fix_selectors(code)
+        
+        # 6. 修复断言语法
         code = self._fix_assertion_syntax(code)
+        
+        # 7. 修复缩进
         code = self._fix_indentation(code)
+        
+        # 8. 清理导入
         code = self._clean_imports(code)
+        
+        # 9. 清理多余空行
         code = re.sub(r'\n{3,}', '\n\n', code)
+        
+        # 10. 确保文件以换行结束
         code = code.rstrip() + '\n'
         
         return code
@@ -736,21 +761,6 @@ class AITestGenerator:
             elif not stripped:
                 new_lines.append('')
         fixed = '\n'.join(new_lines)
-        
-        return fixed
-        
-        # 11. 修复 CSS 选择器语法
-        fixed = fixed.replace('option:not([value=""])', 'option')
-        fixed = fixed.replace("option:not([value=''])", 'option')
-        fixed = fixed.replace('option[value!=""]', 'option')
-        fixed = fixed.replace("option[value!='']", 'option')
-        
-        # 12. 修复严格模式问题 - 添加 .nth(1) 到 option 断言
-        fixed = re.sub(
-            r'expect\(page\.locator\("([^"]*option[^"]*)"\)\.to_contain_text',
-            r'expect(page.locator("\1").nth(1)).to_contain_text',
-            fixed
-        )
         
         return fixed
 
