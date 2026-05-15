@@ -657,6 +657,13 @@ class AITestGenerator:
         # 6. 修复取消弹框按钮选择器
         fixed = fixed.replace('#btnCancelDiscard', '#btnConfirm')
         
+        # 7. 修复严格模式问题 - 添加 .nth(1) 到 option 断言
+        fixed = re.sub(r'expect\(page\.locator\("([^"]*option[^"]*)"\)\.to_contain_text', r'expect(page.locator("\1").nth(1)).to_contain_text', fixed)
+        
+        # 8. 修复通用错误消息 - 将"活动信息未完善"替换为具体错误
+        fixed = fixed.replace('"活动信息未完善"', '"请输入活动名称"')
+        fixed = fixed.replace('"活动信息未完善，请前往完善"', '"请输入活动名称"')
+        
         return fixed
 
     def generate_all_methods(self, all_points: List[str], module_name: str, feature_name: str) -> List[str]:

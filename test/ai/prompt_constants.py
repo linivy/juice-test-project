@@ -97,15 +97,20 @@ def get_cascade_rule(context: dict) -> str:
         "\n## 省市区级联规则\n"
         "- 必须先选择省份，城市的选项才会加载\n"
         "- 必须先选择城市，区县的选项才会加载\n"
-        "- **关键**：必须等待非空选项出现，使用 `option:not([value=''])` 选择器\n"
-        "- 错误写法：`page.wait_for_selector(\"#formCity option\")` 会匹配空选项\n"
-        "- 正确写法：`page.wait_for_selector(\"#formCity option:not([value=''])\")`\n"
+        "- **注意**：选项加载是同步的，选择省份后城市会立即加载\n"
+        "- 推荐写法：使用 `page.wait_for_function` 等待选项数量变化\n"
         "- 示例：\n"
         "```python\n"
         'page.select_option("{form_province}", "广东省")\n'
-        'page.wait_for_selector("{form_city} option:not([value=\'\'])", state="visible")\n'
+        'page.wait_for_function(\"document.querySelectorAll(\'{form_city} option:not([value=\'\'])).length > 0\")\n'
         'page.select_option("{form_city}", "深圳市")\n'
-        'page.wait_for_selector("{form_district} option:not([value=\'\'])", state="visible")\n'
+        'page.wait_for_function(\"document.querySelectorAll(\'{form_district} option:not([value=\'\'])).length > 0\")\n'
+        'page.select_option("{form_district}", "南山区")\n'
+        "```\n"
+        "- 简化写法（适用于快速测试）：\n"
+        "```python\n"
+        'page.select_option("{form_province}", "广东省")\n'
+        'page.select_option("{form_city}", "深圳市")\n'
         'page.select_option("{form_district}", "南山区")\n'
         "```\n"
     ).format(**context)
@@ -223,16 +228,16 @@ def get_submit_hint(context: dict) -> str:
 KEY_POINTS = (
     "\n## 关键要点总结（再次强调）\n"
     "1. 子类型字段：必须先选活动类型，等待 `#subTypeDiv` 可见\n"
-    "2. 省市区级联：必须按顺序选择，并等待下一级选项加载\n"
+    "2. 省市区级联：必须按顺序选择，推荐使用 `page.wait_for_function` 等待或直接选择\n"
     "3. 文件上传：使用 `page.set_input_files(\"input[type='file']\", \"test.pdf\")`\n"
-    "4. 错误消息：检查**具体字段错误**（如\"请输入活动名称\"），不是通用的\"活动信息未完善\"\n"
+    "4. 错误消息：检查**具体字段错误**（如\"请输入活动名称\"），**禁止**使用通用的\"活动信息未完善\"\n"
     "5. 确认弹框：**只在正向成功流程中等待**，验证失败时不要等待\n"
-    "6. 保存草稿：只验证活动名称和活动类型\n"
-    "7. 级联等待：**必须**使用 `page.wait_for_selector(\"#formCity option:not([value=''])\", state=\"visible\")` 等待非空选项，禁止使用不带 `:not([value=''])` 的选择器\n"
-    "8. 断言优先级：测试点描述中的错误消息仅供参考，**必须使用配置文件中定义的具体错误消息**（如配置中的 empty_name、empty_type 等）\n"
-    "9. 活动类型值：`#formType` 的 option value 是 `community`、`family`、`other`，不是显示文本\"社区活动\"等\n"
-    "10. 严格模式：断言多个选项时使用 `.nth(index)` 定位，如 `page.locator(\"#formSubType option\").nth(1)`\n"
-    "11. 取消弹框：放弃创建时使用 `#confirmModal`，不是 `#cancelModal`，确认按钮是 `#btnConfirm`\n"
+    "6. 保存草稿：必须填写活动名称和活动类型两个字段\n"
+    "7. 级联等待：推荐使用 `page.wait_for_function(\"document.querySelectorAll(\"#formCity option:not([value=''])).length > 0\")`\n"
+    "8. 断言优先级：测试点描述中的错误消息仅供参考，**必须使用配置文件中定义的具体错误消息**\n"
+    "9. 活动类型值：`#formType` 的 option value 是 `community`、`family`、`other`，不是显示文本\n"
+    "10. 严格模式：断言多个选项时**必须**使用 `.nth(index)` 定位\n"
+    "11. 取消弹框：放弃创建时使用 `#confirmModal`，确认按钮是 `#btnConfirm`\n"
 )
 
 
