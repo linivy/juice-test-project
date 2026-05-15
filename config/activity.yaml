@@ -16,7 +16,7 @@ selectors:
   create_modal: "#createModal"
   confirm_modal: "#confirmModal"
   cancel_modal: "#cancelModal"
-  discard_modal: "#confirmModal"  # 放弃创建时使用 confirmModal
+  discard_modal: "#confirmModal"
   
   # 表单字段
   form_name: "#formName"
@@ -63,11 +63,30 @@ selector_aliases:
   form_attachment: "#fileInput"
   btn_confirm_cancel: "#btnConfirm"
 
+# ==================== 测试数据（用于后处理修复）====================
+test_data:
+  province: "广东省"
+  city: "深圳市"
+  district: "南山区"
+  activity_type_value: "community"
+  sub_type_text: "运动会"
+  online_platform: "腾讯会议"
+  activity_name: "测试活动"
+  address: "科技园南区A栋"
+
+# ==================== 错误元素映射 ====================
+error_element_mapping:
+  form_name: "#error_formName"
+  form_type: "#error_formType"
+  form_start_time: "#error_formStartTime"
+  form_end_time: "#error_formEndTime"
+  form_description: "#error_formName"  # 活动简介可能复用活动名称的错误元素
+
 # ==================== 示例数据（用于 prompt 中的示例）====================
 example_data:
   activity_name: "测试活动"
-  activity_type: "community"  # 注意：formType 的 option value 是 community, family, other
-  activity_type_label: "社区活动"  # 显示文本
+  activity_type: "community"
+  activity_type_label: "社区活动"
   sub_type: "运动会"
   online_platform: "腾讯会议"
   province: "广东省"
@@ -136,12 +155,12 @@ cascade_rules:
   province_city:
     parent: "#formProvince"
     child: "#formCity"
-    wait_condition: "#formCity option:not([value=''])"  # 已修改
+    wait_condition: "#formCity option:not([value=''])"
     description: "选择省份后城市选项才会加载"
   city_district:
     parent: "#formCity"
     child: "#formDistrict"
-    wait_condition: "#formDistrict option:not([value=''])"  # 已修改
+    wait_condition: "#formDistrict option:not([value=''])"
     description: "选择城市后区县选项才会加载"
 
 # ==================== 验证规则 ====================
