@@ -62,9 +62,10 @@ def get_sub_type_rule(context: dict) -> str:
         "### 子类型下拉框\n"
         "- 默认不可见\n"
         "- **必须先选择活动类型** (`{form_type}`) 才会显示\n"
+        "- **注意**：活动类型的 option value 是 `community`、`family`、`other`，不是显示文本\n"
         "- 示例：\n"
         "```python\n"
-        'page.select_option("{form_type}", "社区活动")\n'
+        'page.select_option("{form_type}", "community")\n'
         'page.wait_for_selector("#subTypeDiv", state="visible")\n'
         'page.select_option("{form_sub_type}", "运动会")\n'
         "```\n"
@@ -96,12 +97,15 @@ def get_cascade_rule(context: dict) -> str:
         "\n## 省市区级联规则\n"
         "- 必须先选择省份，城市的选项才会加载\n"
         "- 必须先选择城市，区县的选项才会加载\n"
+        "- **关键**：必须等待非空选项出现，使用 `option:not([value=''])` 选择器\n"
+        "- 错误写法：`page.wait_for_selector(\"#formCity option\")` 会匹配空选项\n"
+        "- 正确写法：`page.wait_for_selector(\"#formCity option:not([value=''])\")`\n"
         "- 示例：\n"
         "```python\n"
         'page.select_option("{form_province}", "广东省")\n'
         'page.wait_for_selector("{form_city} option:not([value=\'\'])", state="visible")\n'
         'page.select_option("{form_city}", "深圳市")\n'
-        'page.wait_for_selector("{form_district} option", state="visible")\n'
+        'page.wait_for_selector("{form_district} option:not([value=\'\'])", state="visible")\n'
         'page.select_option("{form_district}", "南山区")\n'
         "```\n"
     ).format(**context)
@@ -130,7 +134,7 @@ def get_confirm_modal_rule(context: dict) -> str:
         "```python\n"
         "# 填写所有必填字段后提交\n"
         "page.fill(\"{form_name}\", \"测试活动\")\n"
-        "page.select_option(\"{form_type}\", \"社区活动\")\n"
+        "page.select_option(\"{form_type}\", \"community\")\n"
         "page.wait_for_selector(\"#subTypeDiv\", state=\"visible\")\n"
         "page.select_option(\"{form_sub_type}\", \"运动会\")\n"
         "page.evaluate(\"document.querySelector('{form_start_time}').value = '2024-01-01 10:00';\")\n"
@@ -147,7 +151,7 @@ def get_confirm_modal_rule(context: dict) -> str:
         "验证失败示例（不会弹出确认弹框，直接显示错误）：\n"
         "```python\n"
         "# 活动名称为空，其他字段完整\n"
-        "page.select_option(\"{form_type}\", \"社区活动\")\n"
+        "page.select_option(\"{form_type}\", \"community\")\n"
         "page.wait_for_selector(\"#subTypeDiv\", state=\"visible\")\n"
         "page.select_option(\"{form_sub_type}\", \"运动会\")\n"
         "page.evaluate(\"document.querySelector('{form_start_time}').value = '2024-01-01 10:00';\")\n"
@@ -224,8 +228,11 @@ KEY_POINTS = (
     "4. 错误消息：检查**具体字段错误**（如\"请输入活动名称\"），不是通用的\"活动信息未完善\"\n"
     "5. 确认弹框：**只在正向成功流程中等待**，验证失败时不要等待\n"
     "6. 保存草稿：只验证活动名称和活动类型\n"
-    "7. 级联等待：使用 `page.wait_for_selector(\"#formCity option:not([value=''])\", state=\"visible\")` 等待非空选项\n"
+    "7. 级联等待：**必须**使用 `page.wait_for_selector(\"#formCity option:not([value=''])\", state=\"visible\")` 等待非空选项，禁止使用不带 `:not([value=''])` 的选择器\n"
     "8. 断言优先级：测试点描述中的错误消息仅供参考，**必须使用配置文件中定义的具体错误消息**（如配置中的 empty_name、empty_type 等）\n"
+    "9. 活动类型值：`#formType` 的 option value 是 `community`、`family`、`other`，不是显示文本\"社区活动\"等\n"
+    "10. 严格模式：断言多个选项时使用 `.nth(index)` 定位，如 `page.locator(\"#formSubType option\").nth(1)`\n"
+    "11. 取消弹框：放弃创建时使用 `#confirmModal`，不是 `#cancelModal`，确认按钮是 `#btnConfirm`\n"
 )
 
 
@@ -234,7 +241,7 @@ def get_success_example(context: dict) -> str:
     # 从 context 获取示例数据
     example_data = context.get('example_data', {})
     activity_name = example_data.get('activity_name', '测试活动')
-    activity_type = example_data.get('activity_type', '社区活动')
+    activity_type = example_data.get('activity_type', 'community')  # 使用 option value，不是显示文本
     sub_type = example_data.get('sub_type', '运动会')
     online_platform = example_data.get('online_platform', '腾讯会议')
     
@@ -268,7 +275,7 @@ def get_success_example(context: dict) -> str:
 def get_error_example(context: dict) -> str:
     # 从 context 获取示例数据
     example_data = context.get('example_data', {})
-    activity_type = example_data.get('activity_type', '社区活动')
+    activity_type = example_data.get('activity_type', 'community')  # 使用 option value，不是显示文本
     sub_type = example_data.get('sub_type', '运动会')
     online_platform = example_data.get('online_platform', '腾讯会议')
     

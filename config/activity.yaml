@@ -16,6 +16,7 @@ selectors:
   create_modal: "#createModal"
   confirm_modal: "#confirmModal"
   cancel_modal: "#cancelModal"
+  discard_modal: "#confirmModal"  # 放弃创建时使用 confirmModal
   
   # 表单字段
   form_name: "#formName"
@@ -52,7 +53,8 @@ selectors:
 # ==================== 选择器别名（用于 _fix_selectors）====================
 selector_aliases:
   btn_discard: "#btnCancel"
-  btn_confirm_discard: "#btnConfirmCancel"
+  btn_confirm_discard: "#btnConfirm"
+  btnCancelDiscard: "#btnConfirm"
   form_type_description: "#formOtherType"
   forms_sub_type: "#formSubType"
   forms_description: "#formDescription"
@@ -64,7 +66,8 @@ selector_aliases:
 # ==================== 示例数据（用于 prompt 中的示例）====================
 example_data:
   activity_name: "测试活动"
-  activity_type: "社区活动"
+  activity_type: "community"  # 注意：formType 的 option value 是 community, family, other
+  activity_type_label: "社区活动"  # 显示文本
   sub_type: "运动会"
   online_platform: "腾讯会议"
   province: "广东省"

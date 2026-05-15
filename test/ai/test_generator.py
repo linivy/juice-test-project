@@ -649,11 +649,13 @@ class AITestGenerator:
         fixed = fixed.replace('#formSubtype', '#formSubType')
         fixed = fixed.replace('#formsubType', '#formSubType')
         
-        # 5. 修复 CSS 选择器语法 - 将复杂的转换为简单的
-        fixed = fixed.replace('option:not([value=""])', 'option')
-        fixed = fixed.replace("option:not([value=''])", 'option')
-        fixed = fixed.replace('option[value!=""]', 'option')
-        fixed = fixed.replace("option[value!='']", 'option')
+        # 5. 修复活动类型的 option value - 将显示文本转换为实际 value
+        fixed = fixed.replace('page.select_option("#formType", "社区活动")', 'page.select_option("#formType", "community")')
+        fixed = fixed.replace('page.select_option("#formType", "家庭活动")', 'page.select_option("#formType", "family")')
+        fixed = fixed.replace('page.select_option("#formType", "其他")', 'page.select_option("#formType", "other")')
+        
+        # 6. 修复取消弹框按钮选择器
+        fixed = fixed.replace('#btnCancelDiscard', '#btnConfirm')
         
         return fixed
 

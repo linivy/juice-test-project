@@ -2,7 +2,7 @@
 """
 AI 生成的自动化测试用例
 ================================
-生成时间: 2026-05-15 10:21:09
+生成时间: 2026-05-15 10:43:40
 需求: Requirements/活动管理_01_创建活动.md
 模块: activity
 功能: activity
@@ -37,18 +37,18 @@ class TestActivity:
         except:
             pass
     @allure.feature("创建活动")
-    @allure.title("TC_001: 测试Admin角色填写所有必填字段（活动名称、活动类型、活动时间、活动简介），选择线上地点并上传附件，点击【完成创建】，验证弹出确认弹框，确认后跳转列表页并显示“活动创建成功”toast。")
+    @allure.title("TC_001: 测试Admin角色成功创建线上活动（填写所有必填项，选择线上地点，上传附件，点击【完成创建】）")
     def test_TC_001(self, page):
         self.navigate_to_page(page)
         page.click("#btnCreate")
         page.wait_for_selector("#createModal", state="visible")
-        page.fill("#formName", "测试活动")
+        page.fill("#formName", "测试线上活动")
         page.select_option("#formType", "社区活动")
         page.wait_for_selector("#subTypeDiv", state="visible")
         page.select_option("#formSubType", "运动会")
         page.evaluate("document.querySelector('#formStartTime').value = '2024-01-01 10:00';")
         page.evaluate("document.querySelector('#formEndTime').value = '2024-01-01 18:00';")
-        page.fill("#formDescription", "这是一个测试活动")
+        page.fill("#formDescription", "这是一个线上活动测试")
         page.click('input[name="locationType"][value="online"]')
         page.fill("#formOnlinePlatform", "腾讯会议")
         page.set_input_files("input[type='file']", "test.pdf")
@@ -58,51 +58,46 @@ class TestActivity:
         self.wait_for_toast(page)
         expect(page.locator("#toast")).to_contain_text("活动创建成功")
     @allure.feature("创建活动")
-    @allure.title("TC_002: 测试普通角色填写所有必填字段，选择线下地点（省市区+详细地址），点击【保存】，验证保存为“活动待提交”状态，跳转列表页并显示“草稿已保存，稍后可以继续编辑”toast。")
+    @allure.title("TC_002: 测试普通角色成功保存线下活动草稿（填写所有必填项，选择线下地点，点击【保存】）")
     def test_TC_002(self, page):
         # 1. 导航到页面
         self.navigate_to_page(page)
 
         # 2. 点击创建按钮
         page.click("#btnCreate")
+
+        # 3. 等待创建弹框出现
         page.wait_for_selector("#createModal", state="visible")
 
-        # 3. 填写必填字段（活动名称、活动类型）
-        page.fill("#formName", "测试线下活动")
+        # 4. 填写表单 - 必填项
+        page.fill("#formName", "测试线下活动草稿")
         page.select_option("#formType", "社区活动")
         page.wait_for_selector("#subTypeDiv", state="visible")
         page.select_option("#formSubType", "运动会")
 
-        # 4. 选择线下地点模式
+        # 5. 选择线下地点
         page.click('input[name="locationType"][value="offline"]')
-
-        # 5. 填写省市区级联
         page.select_option("#formProvince", "广东省")
         page.wait_for_selector("#formCity option", state="visible")
         page.select_option("#formCity", "深圳市")
         page.wait_for_selector("#formDistrict option", state="visible")
         page.select_option("#formDistrict", "南山区")
-
-        # 6. 填写详细地址
         page.fill("#formAddress", "科技园南区A栋")
 
-        # 7. 点击保存草稿按钮（只验证活动名称和活动类型）
+        # 6. 点击保存草稿按钮
         page.click("#btnSaveDraft")
 
-        # 8. 验证toast消息
+        # 7. 验证保存成功
         self.wait_for_toast(page)
-        expect(page.locator("#toast")).to_contain_text("草稿已保存，稍后可以继续编辑")
+        expect(page.locator("#toast")).to_contain_text("草稿已保存")
         expect(page.locator("#toast")).to_be_visible()
-
-        # 9. 验证跳转到列表页并显示草稿状态
-        expect(page.locator("#activityTableBody")).to_be_visible()
     @allure.feature("创建活动")
-    @allure.title("TC_003: 测试仅填写活动名称，点击【保存】，验证保存为“活动待提交”状态，跳转列表页并显示“草稿已保存”toast。")
+    @allure.title("TC_003: 测试仅填写活动名称后成功保存草稿（点击【保存】）")
     def test_TC_003(self, page):
         self.navigate_to_page(page)
         page.click("#btnCreate")
         page.wait_for_selector("#createModal", state="visible")
-        page.fill("#formName", "测试活动名称")
+        page.fill("#formName", "测试活动")
         page.select_option("#formType", "社区活动")
         page.wait_for_selector("#subTypeDiv", state="visible")
         page.select_option("#formSubType", "运动会")
@@ -111,69 +106,91 @@ class TestActivity:
         expect(page.locator("#toast")).to_contain_text("草稿已保存")
         expect(page.locator("#toast")).to_be_visible()
     @allure.feature("创建活动")
-    @allure.title("TC_004: 测试选择活动类型“社区活动”，验证二级下拉框显示“运动会”/“知识讲座”/“才艺比赛”。")
+    @allure.title("TC_004: 测试选择活动类型“社区活动”时，二级下拉框联动显示“运动会”、“知识讲座”、“才艺比赛”")
     def test_TC_004(self, page):
         self.navigate_to_page(page)
         page.click("#btnCreate")
         page.wait_for_selector("#createModal", state="visible")
+        page.fill("#formName", "测试活动")
         page.select_option("#formType", "社区活动")
         page.wait_for_selector("#subTypeDiv", state="visible")
-        sub_type_options = page.locator("#formSubType option").all_inner_texts()
+        # 验证二级下拉框包含所有选项
+        options = page.locator("#formSubType option").all_text_contents()
         expected_options = ["运动会", "知识讲座", "才艺比赛"]
         for option in expected_options:
-            assert option in sub_type_options, f"二级下拉框未包含选项: {option}"
+            assert option in options, f"二级下拉框缺少选项: {option}"
+            page.select_option("#formSubType", "运动会")
+            page.evaluate("document.querySelector('#formStartTime').value = '2024-01-01 10:00';")
+            page.evaluate("document.querySelector('#formEndTime').value = '2024-01-01 18:00';")
+            page.fill("#formDescription", "这是一个测试活动")
+            page.click('input[name="locationType"][value="online"]')
+            page.fill("#formOnlinePlatform", "腾讯会议")
+            page.click("#btnSubmit")
+            page.wait_for_selector("#confirmModal", state="visible")
+            page.click("#btnConfirm")
+            self.wait_for_toast(page)
+            expect(page.locator("#toast")).to_contain_text("活动创建成功")
     @allure.feature("创建活动")
-    @allure.title("TC_005: 测试选择活动类型“家庭活动”，验证二级下拉框显示“亲子活动”/“户外露营”/“亲子烘焙”。")
+    @allure.title("TC_005: 测试选择活动类型“家庭活动”时，二级下拉框联动显示“亲子活动”、“户外露营”、“亲子烘焙”")
     def test_TC_005(self, page):
         self.navigate_to_page(page)
         page.click("#btnCreate")
         page.wait_for_selector("#createModal", state="visible")
         page.select_option("#formType", "家庭活动")
         page.wait_for_selector("#subTypeDiv", state="visible")
-        sub_type_options = page.locator("#formSubType option")
-        expect(sub_type_options).to_contain_text(["亲子活动", "户外露营", "亲子烘焙"])
+        expect(page.locator("#formSubType option")).to_contain_text("亲子活动")
+        expect(page.locator("#formSubType option")).to_contain_text("户外露营")
+        expect(page.locator("#formSubType option")).to_contain_text("亲子烘焙")
     @allure.feature("创建活动")
-    @allure.title("TC_006: 测试选择活动类型“其他”，验证二级下拉框消失，显示“活动类型说明”文本输入框（必填，限50字符）。")
+    @allure.title("TC_006: 测试选择活动类型“其他”时，二级下拉框消失并显示“活动类型说明”文本输入框（必填，限50字符）")
     def test_TC_006(self, page):
         # 1. 导航到页面
         self.navigate_to_page(page)
 
-        # 2. 点击创建按钮
+        # 2. 点击创建活动按钮
         page.click("#btnCreate")
+
+        # 3. 等待创建弹框出现
         page.wait_for_selector("#createModal", state="visible")
 
-        # 3. 选择活动类型为"其他"
+        # 4. 填写表单
+        # 4.1 填写活动名称
+        page.fill("#formName", "测试活动")
+
+        # 4.2 选择活动类型为"其他"
         page.select_option("#formType", "其他")
 
-        # 4. 验证二级下拉框消失
+        # 4.3 等待二级下拉框消失
         page.wait_for_selector("#subTypeDiv", state="hidden")
 
-        # 5. 验证"活动类型说明"文本输入框显示
-        expect(page.locator("#formOtherType")).to_be_visible()
-
-        # 6. 填写活动类型说明（必填，限50字符）
+        # 4.4 填写活动类型说明（必填，限50字符）
         page.fill("#formOtherType", "这是一个自定义活动类型说明")
 
-        # 7. 填写其他必填字段
-        page.fill("#formName", "测试活动")
+        # 4.5 填写活动时间
         page.evaluate("document.querySelector('#formStartTime').value = '2024-01-01 10:00';")
         page.evaluate("document.querySelector('#formEndTime').value = '2024-01-01 18:00';")
+
+        # 4.6 填写活动简介
         page.fill("#formDescription", "这是一个测试活动")
+
+        # 4.7 选择线上模式
         page.click('input[name="locationType"][value="online"]')
         page.fill("#formOnlinePlatform", "腾讯会议")
 
-        # 8. 点击提交按钮
+        # 5. 点击提交按钮
         page.click("#btnSubmit")
 
-        # 9. 等待确认弹框并确认
+        # 6. 等待确认弹框
         page.wait_for_selector("#confirmModal", state="visible")
         page.click("#btnConfirm")
 
-        # 10. 验证成功消息
+        # 7. 等待toast消息
         self.wait_for_toast(page)
+
+        # 8. 断言创建成功
         expect(page.locator("#toast")).to_contain_text("活动创建成功")
     @allure.feature("创建活动")
-    @allure.title("TC_007: 测试选择活动地点“线上”，验证显示“平台名称”输入框（限50字符），省市区地址隐藏。")
+    @allure.title("TC_007: 测试选择活动地点“线上”时，显示“平台名称”输入框，隐藏省市区地址")
     def test_TC_007(self, page):
         self.navigate_to_page(page)
         page.click("#btnCreate")
@@ -193,7 +210,7 @@ class TestActivity:
         self.wait_for_toast(page)
         expect(page.locator("#toast")).to_contain_text("活动创建成功")
     @allure.feature("创建活动")
-    @allure.title("TC_008: 测试选择活动地点“线下”，验证显示省市区下拉框 + “详细地址”输入框（限50字符），平台名称隐藏。")
+    @allure.title("TC_008: 测试选择活动地点“线下”时，显示省市区下拉框及“详细地址”输入框，隐藏平台名称")
     def test_TC_008(self, page):
         self.navigate_to_page(page)
         page.click("#btnCreate")
@@ -207,142 +224,110 @@ class TestActivity:
         page.fill("#formDescription", "这是一个测试活动")
         page.click('input[name="locationType"][value="offline"]')
         page.wait_for_selector("#formProvince", state="visible")
+        page.wait_for_selector("#formCity", state="visible")
+        page.wait_for_selector("#formDistrict", state="visible")
+        page.wait_for_selector("#formAddress", state="visible")
+        page.wait_for_selector("#formOnlinePlatform", state="hidden")
         page.select_option("#formProvince", "广东省")
         page.wait_for_selector("#formCity option", state="visible")
         page.select_option("#formCity", "深圳市")
         page.wait_for_selector("#formDistrict option", state="visible")
         page.select_option("#formDistrict", "南山区")
         page.fill("#formAddress", "科技园南区A栋")
-        expect(page.locator("#formOnlinePlatform")).to_be_hidden()
         page.click("#btnSubmit")
         page.wait_for_selector("#confirmModal", state="visible")
         page.click("#btnConfirm")
         self.wait_for_toast(page)
         expect(page.locator("#toast")).to_contain_text("活动创建成功")
     @allure.feature("创建活动")
-    @allure.title("TC_009: 测试活动名称为空")
+    @allure.title("TC_009: 测试所有必填字段为空时，点击【完成创建】的校验提示")
     def test_TC_009(self, page):
-        self.navigate_to_page(page)
-        page.click("#btnCreate")
-        page.wait_for_selector("#createModal", state="visible")
-        page.select_option("#formType", "社区活动")
-        page.wait_for_selector("#subTypeDiv", state="visible")
-        page.select_option("#formSubType", "运动会")
-        page.evaluate("document.querySelector('#formStartTime').value = '2024-01-01 10:00';")
-        page.evaluate("document.querySelector('#formEndTime').value = '2024-01-01 18:00';")
-        page.fill("#formDescription", "这是一个测试活动")
-        page.click('input[name="locationType"][value="online"]')
-        page.fill("#formOnlinePlatform", "腾讯会议")
-        page.click("#btnSubmit")
-        expect(page.locator("#toast")).to_contain_text("请输入活动名称")
-        expect(page.locator("#error_formName")).to_be_visible()
-    @allure.feature("创建活动")
-    @allure.title("TC_010: 测试所有必填字段为空，点击【完成创建】，验证弹出提示“活动信息未完善，请前往完善”。")
-    def test_TC_010(self, page):
         # 测试步骤
         self.navigate_to_page(page)
         page.click("#btnCreate")
         page.wait_for_selector("#createModal", state="visible")
+        # 所有必填字段留空，直接点击完成创建
         page.click("#btnSubmit")
-        expect(page.locator("#toast")).to_contain_text("活动信息未完善，请前往完善")
+        # 验证所有必填字段的错误提示
+        expect(page.locator("#toast")).to_contain_text("请输入活动名称")
+        expect(page.locator("#error_formName")).to_be_visible()
+        expect(page.locator("#toast")).to_contain_text("请选择活动类型")
+        expect(page.locator("#error_formType")).to_be_visible()
+        expect(page.locator("#toast")).to_contain_text("请选择开始时间")
+        expect(page.locator("#error_formStartTime")).to_be_visible()
+        expect(page.locator("#toast")).to_contain_text("请选择结束时间")
+        expect(page.locator("#error_formEndTime")).to_be_visible()
+        expect(page.locator("#toast")).to_contain_text("请输入活动简介")
+        expect(page.locator("#error_formDescription")).to_be_visible()
     @allure.feature("创建活动")
-    @allure.title("TC_011: 测试仅活动名称为空，其他必填字段完整，点击【完成创建】，验证提示“活动信息未完善，请前往完善”，且活动名称字段显示错误“请输入活动名称”。")
+    @allure.title("TC_010: 测试仅活动名称为空时，点击【完成创建】的字段级错误提示")
+    def test_TC_010(self, page):
+        # 1. 导航到页面
+        self.navigate_to_page(page)
+
+        # 2. 点击创建按钮
+        page.click("#btnCreate")
+
+        # 3. 等待创建弹框出现
+        page.wait_for_selector("#createModal", state="visible")
+
+        # 4. 填写表单（活动名称留空）
+        # 选择活动类型
+        page.select_option("#formType", "社区活动")
+        page.wait_for_selector("#subTypeDiv", state="visible")
+        page.select_option("#formSubType", "运动会")
+
+        # 设置活动时间
+        page.evaluate("document.querySelector('#formStartTime').value = '2024-01-01 10:00';")
+        page.evaluate("document.querySelector('#formEndTime').value = '2024-01-01 18:00';")
+
+        # 填写活动简介
+        page.fill("#formDescription", "这是一个测试活动")
+
+        # 选择线上模式
+        page.click('input[name="locationType"][value="online"]')
+        page.fill("#formOnlinePlatform", "腾讯会议")
+
+        # 5. 点击【完成创建】按钮
+        page.click("#btnSubmit")
+
+        # 6. 断言：验证活动名称为空的错误提示
+        expect(page.locator("#toast")).to_contain_text("请输入活动名称")
+        expect(page.locator("#error_formName")).to_be_visible()
+    @allure.feature("创建活动")
+    @allure.title("TC_011: 测试仅活动类型为空时，点击【完成创建】的字段级错误提示")
     def test_TC_011(self, page):
         self.navigate_to_page(page)
         page.click("#btnCreate")
         page.wait_for_selector("#createModal", state="visible")
-        page.select_option("#formType", "社区活动")
-        page.wait_for_selector("#subTypeDiv", state="visible")
-        page.select_option("#formSubType", "运动会")
+        page.fill("#formName", "测试活动")
         page.evaluate("document.querySelector('#formStartTime').value = '2024-01-01 10:00';")
         page.evaluate("document.querySelector('#formEndTime').value = '2024-01-01 18:00';")
         page.fill("#formDescription", "这是一个测试活动")
         page.click('input[name="locationType"][value="online"]')
         page.fill("#formOnlinePlatform", "腾讯会议")
         page.click("#btnSubmit")
-        expect(page.locator("#toast")).to_contain_text("活动信息未完善，请前往完善")
-        expect(page.locator("#error_formName")).to_contain_text("请输入活动名称")
-    @allure.feature("创建活动")
-    @allure.title("TC_012: 测试仅活动类型为空，其他必填字段完整，点击【完成创建】，验证提示“活动信息未完善，请前往完善”，且活动类型字段显示错误“请选择活动类型”。")
-    def test_TC_012(self, page):
-        # 1. 导航到页面
-        self.navigate_to_page(page)
-
-        # 2. 点击创建按钮
-        page.click("#btnCreate")
-
-        # 3. 等待创建弹框出现
-        page.wait_for_selector("#createModal", state="visible")
-
-        # 4. 填写表单（活动类型留空）
-        # 填写活动名称
-        page.fill("#formName", "测试活动名称")
-
-        # 不选择活动类型（留空）
-
-        # 填写开始时间
-        page.evaluate("document.querySelector('#formStartTime').value = '2024-01-01 10:00';")
-
-        # 填写结束时间
-        page.evaluate("document.querySelector('#formEndTime').value = '2024-01-01 18:00';")
-
-        # 填写活动简介
-        page.fill("#formDescription", "这是一个测试活动简介")
-
-        # 选择线上模式
-        page.click('input[name="locationType"][value="online"]')
-
-        # 填写线上平台
-        page.fill("#formOnlinePlatform", "腾讯会议")
-
-        # 5. 点击【完成创建】按钮
-        page.click("#btnSubmit")
-
-        # 6. 验证Toast提示
-        expect(page.locator("#toast")).to_contain_text("活动信息未完善，请前往完善")
-
-        # 7. 验证活动类型字段显示错误提示
+        expect(page.locator("#toast")).to_contain_text("请选择活动类型")
         expect(page.locator("#error_formType")).to_be_visible()
-        expect(page.locator("#error_formType")).to_contain_text("请选择活动类型")
     @allure.feature("创建活动")
-    @allure.title("TC_013: 测试仅活动时间为空，其他必填字段完整，点击【完成创建】，验证提示“活动信息未完善，请前往完善”。")
-    def test_TC_013(self, page):
-        # 1. 导航到页面
+    @allure.title("TC_012: 测试仅活动时间为空时，点击【完成创建】的校验提示")
+    def test_TC_012(self, page):
         self.navigate_to_page(page)
-
-        # 2. 点击创建按钮
         page.click("#btnCreate")
-
-        # 3. 等待创建弹框出现
         page.wait_for_selector("#createModal", state="visible")
-
-        # 4. 填写表单（活动时间留空）
-        # 4.1 填写活动名称
         page.fill("#formName", "测试活动")
-
-        # 4.2 选择活动类型
         page.select_option("#formType", "社区活动")
         page.wait_for_selector("#subTypeDiv", state="visible")
         page.select_option("#formSubType", "运动会")
-
-        # 4.3 活动时间留空（不设置开始时间和结束时间）
-
-        # 4.4 填写活动简介
         page.fill("#formDescription", "这是一个测试活动")
-
-        # 4.5 选择线上模式
         page.click('input[name="locationType"][value="online"]')
         page.fill("#formOnlinePlatform", "腾讯会议")
-
-        # 5. 点击【完成创建】按钮
         page.click("#btnSubmit")
-
-        # 6. 验证提示信息
-        expect(page.locator("#toast")).to_contain_text("活动信息未完善，请前往完善")
-        expect(page.locator("#toast")).to_be_visible()
+        expect(page.locator("#toast")).to_contain_text("请选择开始时间")
+        expect(page.locator("#error_formStartTime")).to_be_visible()
     @allure.feature("创建活动")
-    @allure.title("TC_014: 测试仅活动简介为空，其他必填字段完整，点击【完成创建】，验证提示“活动信息未完善，请前往完善”。")
-    def test_TC_014(self, page):
+    @allure.title("TC_013: 测试仅活动简介为空时，点击【完成创建】的校验提示")
+    def test_TC_013(self, page):
         self.navigate_to_page(page)
         page.click("#btnCreate")
         page.wait_for_selector("#createModal", state="visible")
@@ -355,42 +340,43 @@ class TestActivity:
         page.click('input[name="locationType"][value="online"]')
         page.fill("#formOnlinePlatform", "腾讯会议")
         page.click("#btnSubmit")
-        expect(page.locator("#toast")).to_contain_text("活动信息未完善，请前往完善")
+        expect(page.locator("#toast")).to_contain_text("请输入活动简介")
+        expect(page.locator("#error_formDescription")).to_be_visible()
     @allure.feature("创建活动")
-    @allure.title("TC_015: 测试填写部分信息后，点击【放弃创建】，确认放弃，验证返回列表页，填写的信息不保存。")
-    def test_TC_015(self, page):
+    @allure.title("TC_014: 测试填写部分信息后，点击【放弃创建】并确认放弃，验证返回列表页且信息不保存")
+    def test_TC_014(self, page):
         # 1. 导航到活动列表页
         self.navigate_to_page(page)
 
-        # 2. 点击创建活动按钮
+        # 2. 点击创建按钮，打开创建弹框
         page.click("#btnCreate")
         page.wait_for_selector("#createModal", state="visible")
 
-        # 3. 填写部分信息（活动名称和活动类型）
+        # 3. 填写部分信息（活动名称、活动类型、子类型）
         page.fill("#formName", "测试活动")
         page.select_option("#formType", "社区活动")
         page.wait_for_selector("#subTypeDiv", state="visible")
         page.select_option("#formSubType", "运动会")
 
-        # 4. 点击放弃创建按钮
+        # 4. 点击【放弃创建】按钮
         page.click("#btnCancel")
 
         # 5. 等待确认放弃弹框出现并确认放弃
-        page.wait_for_selector("#cancelModal", state="visible")
+        page.wait_for_selector("#confirmModal", state="visible")
         page.click("#btnConfirm")
 
         # 6. 验证返回列表页（创建弹框关闭）
         page.wait_for_selector("#createModal", state="hidden")
 
-        # 7. 验证列表页没有新增的活动记录（填写的信息不保存）
+        # 7. 验证列表页没有新增的活动记录（信息不保存）
         expect(page.locator("#activityTableBody")).not_to_contain_text("测试活动")
     @allure.feature("创建活动")
-    @allure.title("TC_016: 测试填写部分信息后，点击【放弃创建】，取消放弃，验证停留在创建页，已填写的信息保留。")
-    def test_TC_016(self, page):
+    @allure.title("TC_015: 测试填写部分信息后，点击【放弃创建】并取消放弃，验证停留在创建页且信息保留")
+    def test_TC_015(self, page):
         # 1. 导航到页面
         self.navigate_to_page(page)
 
-        # 2. 点击创建按钮
+        # 2. 点击创建活动按钮
         page.click("#btnCreate")
         page.wait_for_selector("#createModal", state="visible")
 
@@ -402,15 +388,16 @@ class TestActivity:
         page.evaluate("document.querySelector('#formStartTime').value = '2024-01-01 10:00';")
         page.evaluate("document.querySelector('#formEndTime').value = '2024-01-01 18:00';")
 
-        # 4. 点击【放弃创建】按钮
+        # 4. 点击【放弃创建】按钮（假设为 #btnCancel）
         page.click("#btnCancel")
-        page.wait_for_selector("#cancelModal", state="visible")
 
-        # 5. 在确认弹框中点击【取消】按钮（取消放弃）
-        page.click("#btnCancel")
-        page.wait_for_selector("#cancelModal", state="hidden")
+        # 5. 等待确认弹框出现
+        page.wait_for_selector("#confirmModal", state="visible")
 
-        # 6. 验证停留在创建页，已填写的信息保留
+        # 6. 点击取消放弃（假设确认弹框中有取消按钮 #btnCancelDiscard）
+        page.click("#btnCancelDiscard")
+
+        # 7. 验证仍然停留在创建页且信息保留
         expect(page.locator("#createModal")).to_be_visible()
         expect(page.locator("#formName")).to_have_value("测试活动")
         expect(page.locator("#formType")).to_have_value("社区活动")
@@ -418,25 +405,8 @@ class TestActivity:
         expect(page.locator("#formStartTime")).to_have_value("2024-01-01 10:00")
         expect(page.locator("#formEndTime")).to_have_value("2024-01-01 18:00")
     @allure.feature("创建活动")
-    @allure.title("TC_017: 测试活动名称为空")
-    def test_TC_017(self, page):
-        self.navigate_to_page(page)
-        page.click("#btnCreate")
-        page.wait_for_selector("#createModal", state="visible")
-        page.select_option("#formType", "社区活动")
-        page.wait_for_selector("#subTypeDiv", state="visible")
-        page.select_option("#formSubType", "运动会")
-        page.evaluate("document.querySelector('#formStartTime').value = '2024-01-01 10:00';")
-        page.evaluate("document.querySelector('#formEndTime').value = '2024-01-01 18:00';")
-        page.fill("#formDescription", "这是一个测试活动")
-        page.click('input[name="locationType"][value="online"]')
-        page.fill("#formOnlinePlatform", "腾讯会议")
-        page.click("#btnSubmit")
-        expect(page.locator("#toast")).to_contain_text("请输入活动名称")
-        expect(page.locator("#error_formName")).to_be_visible()
-    @allure.feature("创建活动")
-    @allure.title("TC_018: 测试活动类型被停用后，点击【完成创建】，验证弹出提示“所选活动类型已被停用，请选择新的活动类型”。")
-    def test_TC_018(self, page):
+    @allure.title("TC_016: 测试所选活动类型被停用后，点击【完成创建】的提示信息")
+    def test_TC_016(self, page):
         self.navigate_to_page(page)
         page.click("#btnCreate")
         page.wait_for_selector("#createModal", state="visible")
@@ -449,68 +419,54 @@ class TestActivity:
         page.fill("#formDescription", "这是一个测试活动")
         page.click('input[name="locationType"][value="online"]')
         page.fill("#formOnlinePlatform", "腾讯会议")
-        # 模拟活动类型被停用（通过JavaScript修改select选项的disabled属性）
-        page.evaluate("document.querySelector('#formType option[value=\"社区活动\"]').disabled = true;")
+        # 模拟活动类型被停用（通过JavaScript修改select选项为已停用状态）
+        page.evaluate("document.querySelector('#formType').value = 'disabled_type';")
         page.click("#btnSubmit")
         expect(page.locator("#toast")).to_contain_text("所选活动类型已被停用，请选择新的活动类型")
+        expect(page.locator("#error_formType")).to_be_visible()
+    @allure.feature("创建活动")
+    @allure.title("TC_017: 测试重复快速点击【完成创建】按钮，验证只创建一次活动，无重复数据")
+    def test_TC_017(self, page):
+        # 1. 导航到页面
+        self.navigate_to_page(page)
+
+        # 2. 点击创建按钮
+        page.click("#btnCreate")
+        page.wait_for_selector("#createModal", state="visible")
+
+        # 3. 填写表单（所有必填字段）
+        page.fill("#formName", "测试活动")
+        page.select_option("#formType", "社区活动")
+        page.wait_for_selector("#subTypeDiv", state="visible")
+        page.select_option("#formSubType", "运动会")
+        page.evaluate("document.querySelector('#formStartTime').value = '2024-01-01 10:00';")
+        page.evaluate("document.querySelector('#formEndTime').value = '2024-01-01 18:00';")
+        page.fill("#formDescription", "这是一个测试活动")
+        page.click('input[name="locationType"][value="online"]')
+        page.fill("#formOnlinePlatform", "腾讯会议")
+
+        # 4. 点击【完成创建】按钮
+        page.click("#btnSubmit")
+
+        # 5. 等待确认弹框出现
+        page.wait_for_selector("#confirmModal", state="visible")
+
+        # 6. 快速重复点击【确认】按钮
+        page.click("#btnConfirm")
+        page.click("#btnConfirm")
+        page.click("#btnConfirm")
+
+        # 7. 等待 toast 消息
+        self.wait_for_toast(page)
+
+        # 8. 验证只创建一次活动，无重复数据
+        expect(page.locator("#toast")).to_contain_text("活动创建成功")
         expect(page.locator("#toast")).to_be_visible()
-    @allure.feature("创建活动")
-    @allure.title("TC_019: 测试重复快速点击【完成创建】按钮，验证只创建一次活动，不产生重复数据。")
-    def test_TC_019(self, page):
-        self.navigate_to_page(page)
-        page.click("#btnCreate")
-        page.wait_for_selector("#createModal", state="visible")
-        page.fill("#formName", "测试活动")
-        page.select_option("#formType", "社区活动")
-        page.wait_for_selector("#subTypeDiv", state="visible")
-        page.select_option("#formSubType", "运动会")
-        page.evaluate("document.querySelector('#formStartTime').value = '2024-01-01 10:00';")
-        page.evaluate("document.querySelector('#formEndTime').value = '2024-01-01 18:00';")
-        page.fill("#formDescription", "这是一个测试活动")
-        page.click('input[name="locationType"][value="online"]')
-        page.fill("#formOnlinePlatform", "腾讯会议")
-        page.click("#btnSubmit")
-        page.wait_for_selector("#confirmModal", state="visible")
-        page.click("#btnConfirm")
-        self.wait_for_toast(page)
-        expect(page.locator("#toast")).to_contain_text("活动创建成功")
-        page.click("#btnCreate")
-        page.wait_for_selector("#createModal", state="visible")
-        page.fill("#formName", "测试活动")
-        page.select_option("#formType", "社区活动")
-        page.wait_for_selector("#subTypeDiv", state="visible")
-        page.select_option("#formSubType", "运动会")
-        page.evaluate("document.querySelector('#formStartTime').value = '2024-01-01 10:00';")
-        page.evaluate("document.querySelector('#formEndTime').value = '2024-01-01 18:00';")
-        page.fill("#formDescription", "这是一个测试活动")
-        page.click('input[name="locationType"][value="online"]')
-        page.fill("#formOnlinePlatform", "腾讯会议")
-        page.click("#btnSubmit")
-        page.wait_for_selector("#confirmModal", state="visible")
-        page.click("#btnConfirm")
-        self.wait_for_toast(page)
-        expect(page.locator("#toast")).to_contain_text("活动创建成功")
-        assert page.locator("#activityTableBody").count() == 1
-    @allure.feature("创建活动")
-    @allure.title("TC_020: 测试创建活动成功-线上模式-社区活动")
-    def test_TC_020(self, page):
-        self.navigate_to_page(page)
-        page.click("#btnCreate")
-        page.wait_for_selector("#createModal", state="visible")
-        page.fill("#formName", "测试活动")
-        page.select_option("#formType", "社区活动")
-        page.wait_for_selector("#subTypeDiv", state="visible")
-        page.select_option("#formSubType", "运动会")
-        page.evaluate("document.querySelector('#formStartTime').value = '2024-01-01 10:00';")
-        page.evaluate("document.querySelector('#formEndTime').value = '2024-01-01 18:00';")
-        page.fill("#formDescription", "这是一个测试活动")
-        page.click('input[name="locationType"][value="online"]')
-        page.fill("#formOnlinePlatform", "腾讯会议")
-        page.click("#btnSubmit")
-        page.wait_for_selector("#confirmModal", state="visible")
-        page.click("#btnConfirm")
-        self.wait_for_toast(page)
-        expect(page.locator("#toast")).to_contain_text("活动创建成功")
+
+        # 9. 验证活动列表中只有一条记录
+        page.wait_for_selector("#activityTableBody", state="visible")
+        rows = page.locator("#activityTableBody tr")
+        assert rows.count() == 1
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])
