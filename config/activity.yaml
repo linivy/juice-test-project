@@ -1,0 +1,173 @@
+# config/activity.yaml
+project_name: "activity"
+base_url: "http://localhost:5000"
+html_file_path: "activity_management.html"
+
+# ==================== 选择器定义 ====================
+selectors:
+  # 按钮
+  btn_create: "#btnCreate"
+  btn_submit: "#btnSubmit"
+  btn_save_draft: "#btnSaveDraft"
+  btn_confirm: "#btnConfirm"
+  btn_cancel: "#btnCancel"
+  
+  # 模态框
+  create_modal: "#createModal"
+  confirm_modal: "#confirmModal"
+  cancel_modal: "#cancelModal"
+  
+  # 表单字段
+  form_name: "#formName"
+  form_type: "#formType"
+  form_sub_type: "#formSubType"
+  form_start_time: "#formStartTime"
+  form_end_time: "#formEndTime"
+  form_description: "#formDescription"
+  
+  # 地点选择
+  location_type_online: "input[name='locationType'][value='online']"
+  location_type_offline: "input[name='locationType'][value='offline']"
+  form_online_platform: "#formOnlinePlatform"
+  
+  # 省市区
+  form_province: "#formProvince"
+  form_city: "#formCity"
+  form_district: "#formDistrict"
+  form_address: "#formAddress"
+  
+  # 其他类型
+  form_other_type: "#formOtherType"
+  sub_type_div: "#subTypeDiv"
+  
+  # 提示
+  toast: "#toast"
+  
+  # 文件上传
+  file_input: "input[type='file']"
+  
+  # 列表页
+  activity_table: "#activityTableBody"
+
+# ==================== 选择器别名（用于 _fix_selectors）====================
+selector_aliases:
+  btn_discard: "#btnCancel"
+  btn_confirm_discard: "#btnConfirmCancel"
+  form_type_description: "#formOtherType"
+  forms_sub_type: "#formSubType"
+  forms_description: "#formDescription"
+  forms_name: "#formName"
+  forms_type: "#formType"
+  form_attachment: "#fileInput"
+  btn_confirm_cancel: "#btnConfirm"
+
+# ==================== 示例数据（用于 prompt 中的示例）====================
+example_data:
+  activity_name: "测试活动"
+  activity_type: "社区活动"
+  sub_type: "运动会"
+  online_platform: "腾讯会议"
+  province: "广东省"
+  city: "深圳市"
+  district: "南山区"
+  address: "科技园南区A栋"
+
+# ==================== 字段标签 ====================
+field_labels:
+  form_name: "活动名称"
+  form_type: "活动类型"
+  form_start_time: "开始时间"
+  form_end_time: "结束时间"
+  form_description: "活动简介"
+
+# ==================== 错误消息 ====================
+error_messages:
+  empty_name: "请输入活动名称"
+  empty_type: "请选择活动类型"
+  empty_subtype: "请选择子类型"
+  empty_start_time: "请选择开始时间"
+  empty_end_time: "请选择结束时间"
+  empty_description: "请输入活动简介"
+  name_too_long: "字符超限"
+  time_range_invalid: "结束时间不能早于开始时间"
+  type_disabled: "所选活动类型已被停用，请选择新的活动类型"
+
+# ==================== 成功消息 ====================
+success_messages:
+  create_success: "活动创建成功"
+  draft_saved: "草稿已保存"
+  draft_saved_detail: "草稿已保存，稍后可以继续编辑"
+  cancel_success: "已取消"
+  delete_success: "已删除"
+
+# ==================== 级联选项配置 ====================
+cascade_options:
+  formType:
+    社区活动:
+      value: "community"
+      sub_options: ["运动会", "知识讲座", "才艺比赛"]
+      wait_selector: "#subTypeDiv"
+    家庭活动:
+      value: "family"
+      sub_options: ["亲子活动", "户外露营", "亲子烘焙"]
+      wait_selector: "#subTypeDiv"
+    其他:
+      value: "other"
+      sub_options: []
+      show_selector: "#formOtherType"
+      hide_selector: "#subTypeDiv"
+
+# ==================== 地点模式配置 ====================
+location_modes:
+  online:
+    trigger_selector: "input[name='locationType'][value='online']"
+    visible_fields: ["#formOnlinePlatform"]
+    hidden_fields: ["#formProvince", "#formCity", "#formDistrict", "#formAddress"]
+  offline:
+    trigger_selector: "input[name='locationType'][value='offline']"
+    visible_fields: ["#formProvince", "#formCity", "#formDistrict", "#formAddress"]
+    hidden_fields: ["#formOnlinePlatform"]
+
+# ==================== 级联规则 ====================
+cascade_rules:
+  province_city:
+    parent: "#formProvince"
+    child: "#formCity"
+    wait_condition: "#formCity option:not([value=''])"  # 已修改
+    description: "选择省份后城市选项才会加载"
+  city_district:
+    parent: "#formCity"
+    child: "#formDistrict"
+    wait_condition: "#formDistrict option:not([value=''])"  # 已修改
+    description: "选择城市后区县选项才会加载"
+
+# ==================== 验证规则 ====================
+validation_rules:
+  required_fields_for_submit:
+    - form_name
+    - form_type
+    - form_start_time
+    - form_end_time
+    - form_description
+  
+  required_fields_for_draft:
+    - form_name
+    - form_type
+  
+  field_limits:
+    form_name: 50
+    form_description: 200
+    form_online_platform: 50
+    form_address: 50
+    form_other_type: 50
+
+# ==================== 生成配置 ====================
+generation:
+  max_tokens_per_batch: 6000
+  safe_tokens_buffer: 1500
+  default_batch_size: 8
+  max_test_steps: 25
+  enable_completeness_check: True
+  enable_auto_fix: True
+  max_retries: 2
+  renumber_tests: True

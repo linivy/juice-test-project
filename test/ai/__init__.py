@@ -2,15 +2,14 @@
 """AI 辅助测试模块"""
 
 from .test_generator import AITestGenerator
-from .prompts import (
-    TEST_POINTS_PROMPT,
-    TEST_DATA_PROMPT,
-    CODE_GENERATION_PROMPT
-)
+from .config import get_config, get_generation_config, get_all_hints
+from .selector_manager import SelectorManager, SpecialSelectorManager
 
 __all__ = [
     'AITestGenerator',
-    'TEST_POINTS_PROMPT',
-    'TEST_DATA_PROMPT',
-    'CODE_GENERATION_PROMPT'
+    'get_config',
+    'get_generation_config',
+    'get_all_hints',
+    'SelectorManager',
+    'SpecialSelectorManager',
 ]

@@ -1,5 +1,7 @@
 # test/ai/config.py
-"""项目配置 - 根据具体项目修改"""
+import os
+import yaml
+from typing import Dict, Any
 
 # ==================== Juice Shop 项目配置 ====================
 JUICE_CONFIG = {
@@ -37,10 +39,8 @@ JUICE_CONFIG = {
     },
 }
 
-
 # ==================== 活动管理项目配置 ====================
 ACTIVITY_CONFIG = {
-    # ==================== 基础配置 ====================
     "project_name": "activity",
     "base_url": "http://localhost:5000",
     "page_path": "/",
@@ -48,9 +48,7 @@ ACTIVITY_CONFIG = {
     "has_login": False,
     "role_switch": "#roleSelect",
     
-    # ==================== 选择器配置 ====================
     "selectors": {
-        # 按钮
         "btn_create": "#btnCreate",
         "btn_submit": "#btnSubmit",
         "btn_save_draft": "#btnSaveDraft",
@@ -58,8 +56,6 @@ ACTIVITY_CONFIG = {
         "btn_confirm": "#btnConfirm",
         "btn_confirm_cancel": "#btnConfirmCancel",
         "btn_close_modal": "#btnCloseModal",
-        
-        # 表单字段
         "form_name": "#formName",
         "form_type": "#formType",
         "form_sub_type": "#formSubType",
@@ -69,33 +65,23 @@ ACTIVITY_CONFIG = {
         "form_description": "#formDescription",
         "form_remark": "#formRemark",
         "form_online_platform": "#formOnlinePlatform",
-        
-        # 地址相关
         "form_province": "#formProvince",
         "form_city": "#formCity",
         "form_district": "#formDistrict",
         "form_address": "#formAddress",
-        
-        # 地点选择（radio）
         "location_online": "input[name='locationType'][value='online']",
         "location_offline": "input[name='locationType'][value='offline']",
-        
-        # 文件上传
         "file_input": "#fileInput",
         "upload_area": "#uploadArea",
-        
-        # 模态框
         "create_modal": "#createModal",
         "confirm_modal": "#confirmModal",
         "cancel_modal": "#cancelModal",
-        
-        # 其他
         "toast": "#toast",
         "activity_list": "#activityTableBody",
         "role_select": "#roleSelect",
+        "sub_type_div": "#subTypeDiv",  # 添加这个
     },
     
-    # ==================== 错误消息配置 ====================
     "error_messages": {
         "empty_name": "请输入活动名称",
         "empty_type": "请选择活动类型",
@@ -111,7 +97,6 @@ ACTIVITY_CONFIG = {
         "char_limit": "字符超限",
     },
     
-    # ==================== 成功消息配置 ====================
     "success_messages": {
         "create_success": "活动创建成功",
         "save_draft": "草稿已保存",
@@ -120,7 +105,6 @@ ACTIVITY_CONFIG = {
         "delete_success": "已删除",
     },
     
-    # ==================== 级联选项配置 ====================
     "cascade_options": {
         "formType": {
             "社区活动": {
@@ -142,7 +126,6 @@ ACTIVITY_CONFIG = {
         }
     },
     
-    # ==================== 地点模式配置 ====================
     "location_modes": {
         "online": {
             "trigger_selector": "input[name='locationType'][value='online']",
@@ -156,23 +139,27 @@ ACTIVITY_CONFIG = {
         }
     },
     
-    # ==================== 级联选择规则 ====================
     "cascade_rules": {
         "province_city": {
             "parent": "#formProvince",
             "child": "#formCity",
-            "wait_condition": "#formCity option[value!='']",
+            # 修改前
+            # "wait_condition": "#formCity option:not([value=''])",
+            # 修改后
+            "wait_condition": "#formCity option",
             "description": "选择省份后城市选项才会加载"
         },
         "city_district": {
             "parent": "#formCity",
             "child": "#formDistrict",
-            "wait_condition": "#formDistrict option[value!='']",
+            # 修改前
+            # "wait_condition": "#formDistrict option:not([value=''])",
+            # 修改后
+            "wait_condition": "#formDistrict option",
             "description": "选择城市后区县选项才会加载"
         }
     },
     
-    # ==================== 验证规则 ====================
     "validation_rules": {
         "required_fields_for_submit": ["form_name", "form_type", "form_start_time", "form_end_time", "form_description"],
         "required_fields_for_draft": ["form_name", "form_type"],
@@ -185,30 +172,6 @@ ACTIVITY_CONFIG = {
         }
     },
     
-    # ==================== 辅助函数 ====================
-    "helper_functions": """
-    def wait_for_cascade_load(page, child_selector, timeout=5000):
-        '''等待级联下拉框选项加载'''
-        page.wait_for_selector(f"{child_selector} option[value!='']", state="visible", timeout=timeout)
-
-    def select_province_city_district(page, province, city, district):
-        '''选择省市区'''
-        page.select_option("#formProvince", province)
-        wait_for_cascade_load(page, "#formCity")
-        page.select_option("#formCity", city)
-        wait_for_cascade_load(page, "#formDistrict")
-        page.select_option("#formDistrict", district)
-
-    def fill_required_fields_for_draft(page, name, activity_type):
-        '''填写草稿必填字段'''
-        page.fill("#formName", name)
-        page.select_option("#formType", activity_type)
-        # 如果是社区活动或家庭活动，需要等待子类型下拉框
-        if activity_type in ["社区活动", "家庭活动"]:
-            page.wait_for_selector("#subTypeDiv", state="visible")
-            page.select_option("#formSubType", "运动会")  # 示例值
-    """,
-
     "generation": {
         "max_tokens_per_batch": 6000,
         "safe_tokens_buffer": 1500,
@@ -221,14 +184,22 @@ ACTIVITY_CONFIG = {
     },
 }
 
-def get_config(project: str = "juice"):
-    """获取项目配置"""
+
+def get_config(project: str = "juice") -> Dict[str, Any]:
+    """获取项目配置（支持 YAML 和 Python 字典）"""
+    # 优先使用 YAML 配置
+    yaml_path = f"config/{project}.yaml"
+    if os.path.exists(yaml_path):
+        with open(yaml_path, 'r', encoding='utf-8') as f:
+            return yaml.safe_load(f)
+    
+    # 否则使用原有的 Python 字典配置
     if project == "activity":
         return ACTIVITY_CONFIG
     return JUICE_CONFIG
 
 
-def get_generation_config(project: str = "juice"):
+def get_generation_config(project: str = "juice") -> Dict[str, Any]:
     """获取代码生成安全配置"""
     config = get_config(project)
     return config.get("generation", {
@@ -245,7 +216,7 @@ def get_generation_config(project: str = "juice"):
 def get_location_mode_hint(project: str = "activity") -> str:
     """获取地点模式相关的提示词"""
     config = get_config(project)
-    modes = config.get("location_modes", {})  # 改为 location_modes
+    modes = config.get("location_modes", {})
     
     if not modes:
         return ""
@@ -332,7 +303,6 @@ page.fill("#formOtherType", "这是一个自定义活动类型说明")
 - 选择"其他"时，`#formSubType` 会隐藏，需要操作 `#formOtherType`
 """
     return hint
-
 
 def get_all_hints(project: str = "activity") -> str:
     """获取所有增强提示词"""
