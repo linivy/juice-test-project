@@ -11,6 +11,7 @@ selectors:
   btn_save_draft: "#btnSaveDraft"
   btn_confirm: "#btnConfirm"
   btn_cancel: "#btnCancel"
+  btn_confirm_cancel_btn: "#btnConfirmCancelBtn"
   
   # 模态框
   create_modal: "#createModal"
@@ -49,10 +50,11 @@ selectors:
   toast: "#toast"
   
   # 文件上传
-  file_input: "input[type='file']"
+  file_input: "#fileInput"
   
   # 列表页
   activity_table: "#activityTableBody"
+  list_page: "#listPage"
 
 # ==================== 选择器别名（用于 _fix_selectors）====================
 selector_aliases:
@@ -64,7 +66,7 @@ selector_aliases:
   forms_description: "#formDescription"
   forms_name: "#formName"
   forms_type: "#formType"
-  form_attachment: "#fileInput"
+  # form_attachment removed (redundant with selectors.file_input)
   btn_confirm_cancel: "#btnConfirm"
 
 # ==================== 测试数据（用于后处理修复）====================
@@ -84,7 +86,7 @@ error_element_mapping:
   form_type: "#error_formType"
   form_start_time: "#error_formStartTime"
   form_end_time: "#error_formEndTime"
-  form_description: ""
+  form_description: "#error_formDescription"
 
 # ==================== 示例数据（用于 prompt 中的示例）====================
 example_data:
@@ -199,3 +201,13 @@ generation:
   enable_auto_fix: True
   max_retries: 2
   renumber_tests: True
+
+# ==================== 超时配置 ====================
+timeouts:
+  page_load: 10000
+  modal_show: 5000
+  toast_visible: 5000
+  cascade_api: 500
+  file_upload: 500
+  ui_transition: 300
+  ui_short: 200

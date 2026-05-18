@@ -70,6 +70,81 @@ jobs:
             fi
           } > error_body.md
 
+      - name: Classify failures
+        id: auto_fix
+        run: |
+          CLASSIFICATION=""
+          FIX_HINTS=""
+          if [ -f artifacts/pytest.log ]; then
+            # P0 — Selector failures
+            if grep -qE 'locator\.(fill|click).*target not|waiting for selector.*TimeoutError' artifacts/pytest.log; then
+              CLASSIFICATION="P0 — Selector / Locator Failure"
+              FIX_HINTS="Check selectors against config/activity.yaml. Use grep on demo/activity_management.html for actual IDs."
+            fi
+            # P1 — Timing failures
+            if grep -qE 'TimeoutError.*to be visible|wait_for_selector.*exceeded' artifacts/pytest.log; then
+              CLASSIFICATION="${CLASSIFICATION:+$CLASSIFICATION, }P1 — Timing / Wait Failure"
+              FIX_HINTS="${FIX_HINTS:+$FIX_HINTS; }Missing cascade prerequisite or wait too short. Ensure page.select_option before waiting."
+            fi
+            # P2 — Assertion failures
+            if grep -q 'AssertionError' artifacts/pytest.log; then
+              CLASSIFICATION="${CLASSIFICATION:+$CLASSIFICATION, }P2 — Assertion Failure"
+              FIX_HINTS="${FIX_HINTS:+$FIX_HINTS; }Check validation order in validateForm(). Earlier fields must be filled first."
+            fi
+            # P3 — Modal failures
+            if grep -qE 'intercepts pointer|not clickable' artifacts/pytest.log; then
+              CLASSIFICATION="${CLASSIFICATION:+$CLASSIFICATION, }P3 — Modal / Dialog Failure"
+              FIX_HINTS="${FIX_HINTS:+$FIX_HINTS; }Check modal button IDs: confirmModal uses btnConfirm/btnConfirmCancelBtn."
+            fi
+            # P4 — Import failures
+            if grep -qE 'ModuleNotFoundError|ImportError' artifacts/pytest.log; then
+              CLASSIFICATION="${CLASSIFICATION:+$CLASSIFICATION, }P4 — Environment / Import Failure"
+              FIX_HINTS="${FIX_HINTS:+$FIX_HINTS; }Run: pip install pyyaml pytest-playwright"
+            fi
+          fi
+          echo "classification=${CLASSIFICATION:-Unclassified}" >> $GITHUB_OUTPUT
+          echo "fix_hints=${FIX_HINTS:-Review pytest log for details}" >> $GITHUB_OUTPUT
+
+      - name: Install DeepSeek TUI
+        id: install_tui
+        continue-on-error: true
+        run: |
+          if [ -n "$DEEPSEEK_API_KEY" ]; then
+            curl -fsSL https://deepseek.com/install.sh | bash 2>/dev/null || true
+            echo "installed=true" >> $GITHUB_OUTPUT
+          else
+            echo "installed=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+
+      - name: Auto-fix with DeepSeek TUI
+        id: auto_fix_tui
+        continue-on-error: true
+        if: steps.install_tui.outputs.installed == 'true'
+        run: |
+          deepseek --no-interactive "请使用 auto-fix skill 分析 artifacts/pytest.log 中的失败原因，直接修改对应的测试代码修复问题。不要输出解释，只执行修复。"
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+
+      - name: Commit and push auto-fix
+        id: commit_fix
+        continue-on-error: true
+        if: steps.auto_fix_tui.outcome == 'success'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          if ! git diff --cached --quiet; then
+            git commit -m "auto-fix: repair test failures [skip ci]"
+            git push origin ${{ github.ref_name }}
+            echo "pushed=true" >> $GITHUB_OUTPUT
+          else
+            echo "no changes to commit"
+            echo "pushed=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Create Issue
         uses: actions/github-script@v7
         with:
@@ -78,6 +153,8 @@ jobs:
             const runInfo = ${{ toJson(steps.run_info.outputs) }};
             const errorSummary = '${{ steps.error_summary.outputs.summary }}';
             const errorBody = fs.readFileSync('error_body.md', 'utf8');
+            const classification = '${{ steps.auto_fix.outputs.classification }}';
+            const fixHints = '${{ steps.auto_fix.outputs.fix_hints }}';
 
             const issueTitle = `Test failure - ${runInfo.head_branch} (${runInfo.head_sha})`;
 
@@ -91,9 +168,21 @@ jobs:
 
             **Summary:** ${errorSummary}
 
+            **Failure Type:** ${classification}
+
             [View Run Details](${runInfo.run_url})
 
             ${errorBody}
+
+            ---
+            ## Auto-Fix Hints
+
+            ${fixHints}
+
+            To attempt automatic repair, use the **auto-fix** skill:
+            \`\`\`
+            /skill auto-fix
+            \`\`\`
 
             ---
             > Auto-created by create-issue-on-failure.yml
