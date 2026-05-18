@@ -2,62 +2,126 @@ name: Create Issue on Test Failure
 
 on:
   workflow_run:
-    workflows: ["Run Tests"]
-    types:
-      - completed
+    workflows: [Test]
+    types: [completed]
+    branches: [main, master]
 
 jobs:
   create-issue:
-    runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'failure' }}
-    permissions:
-      issues: write
-      actions: read
-      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
     steps:
-      - name: Download test results
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get workflow run info
+        id: run_info
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const run = await github.rest.actions.getWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.payload.workflow_run.id,
+            });
+            return {
+              run_id: run.data.id,
+              run_url: run.data.html_url,
+              head_branch: run.data.head_branch,
+              head_sha: run.data.head_sha?.substring(0, 7),
+              created_at: run.data.created_at,
+              event: run.data.event,
+              actor: run.data.actor.login,
+            };
+
+      - name: Download test artifacts
         uses: actions/download-artifact@v4
         with:
-          name: test-results
-          path: ./test-results
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          name: test-report
           run-id: ${{ github.event.workflow_run.id }}
-        continue-on-error: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: artifacts/
 
-      - name: Get failure details
-        id: failures
+      - name: Extract error summary
+        id: error_summary
         run: |
-          FAILURE_DETAILS=""
-          
-          # 尝试从 output.txt 提取失败信息
-          if [ -f ./test-results/output.txt ]; then
-            FAILURE_DETAILS=$(grep -A 10 "FAILED" ./test-results/output.txt | head -50)
+          ERROR_SUMMARY="No details available"
+          if [ -f artifacts/pytest.log ]; then
+            FAILURES=$(grep -c "FAILED" artifacts/pytest.log 2>/dev/null || echo "0")
+            ERRORS=$(grep -c "ERROR" artifacts/pytest.log 2>/dev/null || echo "0")
+            ERROR_SUMMARY="${FAILURES} failures, ${ERRORS} errors"
+            echo "failures=$FAILURES" >> $GITHUB_OUTPUT
+            echo "errors=$ERRORS" >> $GITHUB_OUTPUT
           fi
-          
-          # 如果 output.txt 没有，尝试从 results.xml 提取
-          if [ -z "$FAILURE_DETAILS" ] && [ -f ./test-results/results.xml ]; then
-            FAILURE_DETAILS=$(grep -A 5 "failure" ./test-results/results.xml | head -30)
-          fi
-          
-          # 如果都没有，使用默认消息
-          if [ -z "$FAILURE_DETAILS" ]; then
-            FAILURE_DETAILS="测试失败，请查看运行日志获取详细信息"
-          fi
-          
-          # 设置输出
-          echo "details<<EOF" >> $GITHUB_OUTPUT
-          echo "$FAILURE_DETAILS" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          echo "summary=$ERROR_SUMMARY" >> $GITHUB_OUTPUT
+
+      - name: Build error details
+        id: error_details
+        run: |
+          {
+            echo '## Test Failure Details'
+            echo ''
+            if [ -f artifacts/pytest.log ]; then
+              echo '```'
+              grep -A 3 "FAILED\|ERROR" artifacts/pytest.log | head -60 || echo "No summary available"
+              echo '```'
+            fi
+          } > error_body.md
 
       - name: Create Issue
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RUN_URL: ${{ github.event.workflow_run.html_url }}
-          RUN_NUMBER: ${{ github.event.workflow_run.run_number }}
-          BRANCH: ${{ github.event.workflow_run.head_branch }}
-          REPO: ${{ github.repository }}
-        run: |
-          gh issue create \
-            --title "[自动化Bug] 测试失败 - 运行 #${RUN_NUMBER}" \
-            --body "## 🐛 测试失败报告\n\n**运行链接**: ${RUN_URL}\n\n**分支**: ${BRANCH}\n\n**失败详情**:\n\`\`\`\n${{ steps.failures.outputs.details }}\n\`\`\`\n\n---\n*此 issue 由 GitHub Actions 自动创建*" \
-            --label "bug,auto-reported"
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const runInfo = ${{ toJson(steps.run_info.outputs) }};
+            const errorSummary = '${{ steps.error_summary.outputs.summary }}';
+            const errorBody = fs.readFileSync('error_body.md', 'utf8');
+
+            const issueTitle = `Test failure - ${runInfo.head_branch} (${runInfo.head_sha})`;
+
+            const issueBody = `## Test Run Failed
+
+            **Trigger:** ${runInfo.event}
+            **Branch:** ${runInfo.head_branch}
+            **Commit:** ${runInfo.head_sha}
+            **Actor:** ${runInfo.actor}
+            **Time:** ${runInfo.created_at}
+
+            **Summary:** ${errorSummary}
+
+            [View Run Details](${runInfo.run_url})
+
+            ${errorBody}
+
+            ---
+            > Auto-created by create-issue-on-failure.yml
+            > Download test artifacts from [Actions](${runInfo.run_url})`;
+
+            const { data: existing } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'test-failure',
+              per_page: 5,
+            });
+
+            const duplicate = existing.find(i => i.title.includes(runInfo.head_sha));
+            if (duplicate) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: duplicate.number,
+                body: `Retry failed on same commit: ${runInfo.head_sha}\n[View Run](${runInfo.run_url})`,
+              });
+              return;
+            }
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: issueTitle,
+              body: issueBody,
+              labels: ['test-failure', 'automated'],
+            });

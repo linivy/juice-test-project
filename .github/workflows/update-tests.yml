@@ -1,0 +1,101 @@
+name: Requirement Change Reminder
+
+on:
+  pull_request:
+    paths:
+      - "Requirements/**"
+    branches: [main, master]
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get changed requirement files
+        id: changed_files
+        run: |
+          git diff --name-only origin/${{ github.base_ref }}...HEAD -- Requirements/ > changed.txt
+          cat changed.txt
+          COUNT=$(wc -l < changed.txt)
+          echo "count=$COUNT" >> $GITHUB_OUTPUT
+          echo "files<<EOF" >> $GITHUB_OUTPUT
+          cat changed.txt >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Generate test update checklist
+        id: checklist
+        if: steps.changed_files.outputs.count != '0'
+        run: |
+          echo "## Test Update Reminder" > reminder.md
+          echo "" >> reminder.md
+          echo "The following requirement documents were changed in this PR. Please verify whether corresponding test cases need updates:" >> reminder.md
+          echo "" >> reminder.md
+          while IFS= read -r file; do
+            MODULE=$(basename "$file" .md)
+            echo "- $MODULE" >> reminder.md
+          done < changed.txt
+          echo "" >> reminder.md
+          echo "### Checklist" >> reminder.md
+          echo "- [ ] Do test cases cover new/modified requirements?" >> reminder.md
+          echo "- [ ] Are selectors consistent with frontend changes?" >> reminder.md
+          echo "- [ ] Are expected error messages and toast texts updated?" >> reminder.md
+          echo "- [ ] Do boundary value test data need adjustment?" >> reminder.md
+          echo "" >> reminder.md
+          echo "### Run Tests" >> reminder.md
+          echo '```bash' >> reminder.md
+          echo "cd demo && python server.py &" >> reminder.md
+          echo "pytest test/ai/generated/activity/ -v --browser=chromium" >> reminder.md
+          echo '```' >> reminder.md
+
+      - name: Comment on PR
+        if: steps.changed_files.outputs.count != '0'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const reminder = fs.readFileSync('reminder.md', 'utf8');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(c =>
+              c.user.type === 'Bot' &&
+              c.body.includes('Test Update Reminder')
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: reminder,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: reminder,
+              });
+            }
+
+      - name: Add label
+        if: steps.changed_files.outputs.count != '0'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ['requirements-changed', 'needs-test-update'],
+            });

@@ -1,138 +1,102 @@
-name: Run Tests
+name: Test
 
 on:
   push:
-    branches:
-      - 'main'
-      - 'milestone/**'
-      - 'release/**'
-      - 'feature/**'
-    paths-ignore:
-      - 'README.md'
-      - '**.md'
-      - '.gitignore'
-  
+    branches: [main, master]
   pull_request:
-    branches:
-      - 'main'
-      - 'milestone/**'
-      - 'release/**'
-  
+    branches: [main, master]
   workflow_dispatch:
-    inputs:
-      test_level:
-        description: '选择测试级别'
-        required: true
-        default: 'smoke'
-        type: choice
-        options:
-          - 'smoke'
-          - 'critical'
-          - 'regression'
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      issues: write
-      pull-requests: write
-    timeout-minutes: 10
+    timeout-minutes: 15
+
     steps:
-      - uses: actions/checkout@v4
-      
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-      
-      - name: Install dependencies
-        run: |
-          pip install pytest pytest-playwright
-          playwright install chromium
-      
-      - name: Start Juice Shop
-        run: docker run -d -p 3000:3000 bkimminich/juice-shop
-      
-      - name: Wait for Juice Shop
-        run: sleep 10
-      
-      - name: Determine test scope
-        id: scope
-        run: |
-          BRANCH_NAME="${{ github.ref_name }}"
-          TEST_PATH=""
-          TEST_LEVEL=""
-          
-          # 根据分支名确定测试级别
-          if [[ "$BRANCH_NAME" =~ ^milestone/ ]]; then
-            TEST_PATH="test/"
-            TEST_LEVEL="regression"
-          elif [[ "$BRANCH_NAME" =~ ^release/ ]]; then
-            TEST_PATH="test/smoke/ test/forms/ test/list/ test/common/"
-            TEST_LEVEL="critical"
-          elif [[ "$BRANCH_NAME" =~ ^feature/ ]] || [ "$BRANCH_NAME" = "main" ]; then
-            TEST_PATH="test/smoke/"
-            TEST_LEVEL="smoke"
-          elif [ "${{ github.event_name }}" = "pull_request" ]; then
-            TEST_PATH="test/smoke/ test/forms/ test/list/ test/common/"
-            TEST_LEVEL="critical"
-          elif [ "${{ github.event.inputs.test_level }}" = "smoke" ]; then
-            TEST_PATH="test/smoke/"
-            TEST_LEVEL="smoke"
-          elif [ "${{ github.event.inputs.test_level }}" = "critical" ]; then
-            TEST_PATH="test/smoke/ test/forms/ test/list/ test/common/"
-            TEST_LEVEL="critical"
-          elif [ "${{ github.event.inputs.test_level }}" = "regression" ]; then
-            TEST_PATH="test/"
-            TEST_LEVEL="regression"
-          else
-            TEST_PATH="test/smoke/"
-            TEST_LEVEL="smoke"
-          fi
-          
-          echo "test_path=$TEST_PATH" >> $GITHUB_OUTPUT
-          echo "test_level=$TEST_LEVEL" >> $GITHUB_OUTPUT
-          echo "确定测试级别: $TEST_LEVEL"
-          echo "确定测试路径: $TEST_PATH"
-      
-      - name: Run tests
-        id: tests
-        run: |
-          pytest ${{ steps.scope.outputs.test_path }} -v --tb=short 2>&1 | tee test-output.txt
-          EXIT_CODE=${PIPESTATUS[0]}
-          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
-          exit $EXIT_CODE
+          python-version: "3.11"
 
-      - name: Upload artifacts
+      - name: Install system deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libegl1 libxkbcommon0 libglib2.0-0
+
+      - name: Install Python deps
+        run: |
+          pip install --upgrade pip
+          pip install flask flask-cors
+          pip install pytest pytest-playwright pytest-html pytest-xdist
+          pip install -r requirements.txt
+
+      - name: Install Playwright browsers
+        run: |
+          python -m playwright install chromium --with-deps
+
+      - name: Start demo server
+        run: |
+          cd demo
+          python server.py &
+          sleep 3
+          curl -s -o /dev/null -w "%{http_code}" http://localhost:5000 || (echo "Server failed to start" && exit 1)
+
+      - name: Run tests
+        id: pytest
+        continue-on-error: true
+        run: |
+          mkdir -p test-reports test-results/screenshots test-results/videos
+          pytest test/ai/generated/activity/ \
+            -v \
+            --tb=short \
+            --browser=chromium \
+            --headed=false \
+            --html=test-reports/test_report.html \
+            --self-contained-html \
+            --junitxml=test-results/junit.xml \
+            2>&1 | tee test-results/pytest.log
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+
+      - name: Upload test report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-artifacts-${{ steps.scope.outputs.test_level }}
+          name: test-report
           path: |
-            test-results/
-            test-output.txt
+            test-reports/test_report.html
+            test-results/junit.xml
+            test-results/pytest.log
+          retention-days: 30
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-screenshots
+          path: test-results/screenshots/
+          if-no-files-found: ignore
           retention-days: 7
 
-      - name: Create Issue on push failure
-        if: steps.tests.outputs.exit_code != '0' && github.event_name == 'push'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          RUN_NUMBER: ${{ github.run_number }}
-          BRANCH: ${{ github.ref_name }}
+      - name: Notify on failure
+        if: ${{ steps.pytest.outputs.exit_code != '0' && vars.WEBHOOK_URL != '' }}
         run: |
-          FAILED=$(grep "FAILED" test-output.txt | head -3 | tr '\n' ';')
-          echo "## 🐛 测试失败报告\n**运行链接**: ${RUN_URL}\n**运行编号**: #${RUN_NUMBER}\n**测试级别**: ${{ steps.scope.outputs.test_level }}\n**分支**: ${BRANCH}\n\n### 失败的测试\n\n\`${FAILED}\`\n\n---\n*此 Issue 由 GitHub Actions 自动创建*" > issue_body.md
-          gh issue create --title "[自动化Bug] ${{ steps.scope.outputs.test_level }} 测试失败 - 运行 #${RUN_NUMBER}" --body-file issue_body.md --label "bug" 2>/dev/null || echo "Issue 创建失败或已存在"
+          curl -X POST "${{ vars.WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "text": "Activity Management tests failed",
+              "repository": "${{ github.repository }}",
+              "branch": "${{ github.ref_name }}",
+              "commit": "${{ github.sha }}",
+              "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }'
 
-      - name: Comment on PR failure
-        if: steps.tests.outputs.exit_code != '0' && github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          FAILED=$(grep "FAILED" test-output.txt | head -3 | tr '\n' ';')
-          echo "## ❌ 测试失败\n**测试级别**: ${{ steps.scope.outputs.test_level }}\n**运行链接**: [查看详情](${RUN_URL})\n\n### 失败的测试\n\n\`${FAILED}\`\n\n请点击上方链接查看详细日志。" > pr_comment.md
-          gh pr comment ${PR_NUMBER} --body-file pr_comment.md
+      - name: Fail if tests failed
+        if: steps.pytest.outputs.exit_code != '0'
+        run: exit 1
