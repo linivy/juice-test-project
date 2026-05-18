@@ -8,7 +8,8 @@ from playwright.sync_api import Page
 
 # ==================== 配置加载 ====================
 
-_CFG_PATH = Path(__file__).resolve().parent.parent.parent.parent / "config" / "activity.yaml"
+# 路径: test/ai/generated/activity/conftest.py → 项目根 (5 级 up)
+_CFG_PATH = Path(__file__).resolve().parent.parent.parent.parent.parent / "config" / "activity.yaml"
 with open(_CFG_PATH, encoding="utf-8") as _f:
     _cfg = yaml.safe_load(_f)
 
